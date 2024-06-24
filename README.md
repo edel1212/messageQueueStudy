@@ -49,15 +49,27 @@
 
 ### 주요 Message Queue 시스템
 - Apache Kafka ( ℹ️ 해당 시스템을 사용허여 토이 프로젝트를 진행 )
-  - 메시지큐 방식 기반, 분산 메시징 시스템이다.
+  - 오픈 소스 스트리밍 플랫폼으로, 대량의 데이터를 신속하게 처리하고, 저장하며, 전송할 수 있습니다.
   - 큐를 구현하지 않음 대신에 토픽(`topic`)라고 불리는 카테고리에 데이터 집합을 저장
     - 하나의 topic은 다수개의 partition으로 나뉘어진다.
   - `Kafka Cluster`를 통해 병렬처리가 주요 차별점인 만큼 방대한 양의 데이터를 처리할 때, 장점이 부각된다.
   - `이벤트 브로커(Event Broker)` 방식이다.
+  - 👉 [Kafka 처리 구조]
+    - `Producer`가 토픽(`topic`)으로 메시지를 전송합니다.
+    - `Broker`에서 메시지는 특정 파티션(`partition`)으로 분배됩니다.
+    - 각 `Consumer Group`에 속한 `Consumer`가 토픽(`topic`)의 파티션(`partition`)을 구독하고 메시지를 소비합니다.
+    - `Consumer Group` 내에서는 각 `Consumer`가 독립적으로 처리할 수 있습니다.
+    - **데이터를 저장**할 때 기본적으로 **디스크에 저장**하므로, 데이터를 장기간 보관하는 데 적합합니다.
 - RabbitMQ
   - AMQP(Advanced Message Queuing Protocol)를 기반으로 하는 오픈 소스 메시지 브로커. 다양한 라우팅 기능과 플러그인을 제공.
   - 기본적으로 전통적인 Message Queue 방식을 지원합니다.또한, message exchange( 메시지를 송수신하는 데 사용되는 메커니즘)를 사용하여 pub/sub 방식도 구현합니다.
+  - 데이터 처리 보단, 관리적 측면이나 다양한 기능 구현을 위한 서비스를 구축할 때 사용
+  - Producer와 Consumer의 결합도가 높습니다.
   - `메세지 브로커(Message Broker)` 방식이다.
+  - 👉 [RabbitMQ 처리 구조]
+    - `Producer`가 `Broker`로 메세지를 보냅니다.
+    - `Broker`내 `Exchange`에서 해당하는 `Key`에 맞게 `Queue`에 분배합니다.(Binding)
+    - 해당 `Queue`를 구독하는 `Consumer`가 메세지를 소비합니다.
 - Amazon SQS (Simple Queue Service)
   - AWS에서 제공하는 관리형 메시지 큐 서비스로, 고가용성과 확장성을 제공.  
 
