@@ -14,9 +14,11 @@
   - `docker exec -it {{container_name}} /bin/bash`
 - ℹ️ Producer
   - `Topic` 생성
-    - `kafka-topics.sh --create --topic [생성할 topic 이름] --bootstrap-server [ Kafka Broker 도메인 ] --partitions [ 분할 파티션 개수 ]`  
+    - `kafka-topics.sh --create --topic [ 생성할 topic명 ] --bootstrap-server [ Kafka Broker 도메인 ] --partitions [ 분할 파티션 개수 ]`  
   - `Topic` 목록 확인
     - `kafka-topics.sh --bootstrap-server [ Kafka Broker 도메인 ] --list`
+  - `Topic` 접근 (메세지 등록)
+    - `kafka-console-producer.sh --bootstrap-server [ Kafka Broker 도메인 ] --topic [생성할 topic명]`
   - `Topic` 삭제
     - `kafka-topics.sh --delete --topic [삭제할 topic 이름] --bootstrap-server [ Kafka Broker 도메인 ]`
   - `Topic` 정보 확인
