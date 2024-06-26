@@ -7,19 +7,28 @@
 
 - `Kafka Brokder`는 기본적으로 9022 포트에서 구동된다.
 - `Zookeeper` 서버가 구동된 상태일때만 Kafka Broker 구동이 가능 하다.
-  -  단 다음 버전에서부터는 `Kafka`만으로도 구동이 가능해 질 수 있다는 정보가 있
+  - `Zookeeper`가 메타 데이터를 관리해 주기 떄문이다.  
 
 ### Zookeeper 및 Kafka 실행
 - 접근 
   - `docker exec -it {{container_name}} /bin/bash`
-- `Topic` 생성
-  - `kafka-topics.sh --create --topic [생성할 topic 이름] --bootstrap-server [ Kafka Broker 도메인 ] --partitions [ 파티션 번호 ]`  
-- `Topic` 목록 확인
-  - `kafka-topics.sh --bootstrap-server [ Kafka Broker 도메인 ] --list`
-- `Topic` 삭제
-  - `kafka-topics.sh --delete --topic [삭제할 topic 이름] --bootstrap-server [ Kafka Broker 도메인 ]`
-- `Topic` 정보 확인
-  - `kafka-topics.sh --describe --topic [확인할 topic 이름] --bootstrap-server [ Kafka Broker 도메인 ]`
+- ℹ️ Producer
+  - `Topic` 생성
+    - `kafka-topics.sh --create --topic [생성할 topic 이름] --bootstrap-server [ Kafka Broker 도메인 ] --partitions [ 분할 파티션 개수 ]`  
+  - `Topic` 목록 확인
+    - `kafka-topics.sh --bootstrap-server [ Kafka Broker 도메인 ] --list`
+  - `Topic` 삭제
+    - `kafka-topics.sh --delete --topic [삭제할 topic 이름] --bootstrap-server [ Kafka Broker 도메인 ]`
+  - `Topic` 정보 확인
+    - `kafka-topics.sh --describe --topic [확인할 topic 이름] --bootstrap-server [ Kafka Broker 도메인 ]`
+- ℹ️ Consumer
+  - `Topic` 메세지 확인
+    - 일반 구독 확인
+      - `kafka-console-consumer.sh --bootstrap-server [ Kafka Broker 도메인 ] --topic [구독할 topic 이름]`
+    - 이전 메세지까지 확인 (`--from-beginning`)
+      - `kafka-console-consumer.sh --bootstrap-server [ Kafka Broker 도메인 ] --topic [구독할 topic 이름] --from-beginning`
+    - 확인한 메세지 안보이게 (`--from-beginning`)
+      - `kafka-console-consumer.sh --bootstrap-server [ Kafka Broker 도메인 ] --topic [구독할 topic 이름] --group [ 그룹 지정 ]`
 ```properties
 services:
   zookeeper:
