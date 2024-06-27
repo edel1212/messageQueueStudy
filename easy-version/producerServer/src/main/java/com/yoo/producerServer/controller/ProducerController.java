@@ -14,6 +14,7 @@ public class ProducerController {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     @GetMapping
     public ResponseEntity sendData(String topic, String data){
+        // ℹ️ kafkaTemplate 내 내장된 메서드를 통해 Kafa 사용이 가능하다.
         kafkaTemplate.send(topic, data);
         return ResponseEntity.ok().body("Success");
     }
