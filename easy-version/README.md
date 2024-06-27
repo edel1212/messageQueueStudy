@@ -103,3 +103,55 @@
       }
   }
   ```
+
+#### Consumer Server
+- Dependencies
+  ```groovy
+  implementation 'org.springframework.kafka:spring-kafka'
+  testImplementation 'org.springframework.kafka:spring-kafka-test'
+  ```
+- Kafka 설정
+  ```java
+  @Configuration
+  public class KafkaConsumerConfig {
+
+    @Bean
+    public ConsumerFactory<String, Object> consumerFactory() {
+        Map<String, Object> config = new HashMap<>();
+        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        // 전달 받을 그룹명 설정 - 해당 설정으로 확인한 메세지는 보이지 않는다.
+        config.put(ConsumerConfig.GROUP_ID_CONFIG, "group_1");
+        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+
+        return new DefaultKafkaConsumerFactory<>(config);
+    }
+
+    /**
+     * @KafkaListener 어노테이션이 붙은 메서드에 주입되어 사용된다.
+     * - 메시지를 동시에 처리할 수 있는 메시지 리스너 컨테이너를 생성합니다.
+     * */
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory());
+        return factory;
+    }
+  }
+  ```
+
+- 지정 Topic 메세지 응답
+  ```java
+  @Component
+  @Log4j2
+  public class KafkaConsumerService {
+      @KafkaListener(topics = "foo")
+      public void listener(Object data) {
+         log.info("--------------------");
+         log.info("Group Name :: group_1");
+         log.info("Topic Name :: foo");
+          log.info("data :: {}", data);
+         log.info("--------------------");
+      }
+  }
+  ```
