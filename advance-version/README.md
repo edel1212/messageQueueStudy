@@ -33,5 +33,11 @@
   - 네트워크 주소는 컨테이너명으로 지정해줘야한다.
   - Port는 Docker-Compose 내 설정한 Port로 작성해줘야한다.
 - 예시
-  - `kafka-console-producer --bootstrap-server localhost:29092,kafka_zookeeper_compose-kafka-2-1:29093,kafka_zookeeper_compose-kafka-3-1:29094 --topic gom`   
+  - 메세지 등록   
+    - `kafka-console-producer --bootstrap-server kafka_zookeeper_compose-kafka-1-1:29092,kafka_zookeeper_compose-kafka-2-1:29093,kafka_zookeeper_compose-kafka-3-1:29094 --topic gom`
+  - 컨슈머 등록
+    - 이전 까지 모든 메세지
+      -  `kafka-console-consumer --bootstrap-server kafka_zookeeper_compose-kafka-1-1:29092,kafka_zookeeper_compose-kafka-2-1:29093,kafka_zookeeper_compose-kafka-3-1:29094 --topic gom   --from-beginning`
+    -  그룹 지정
+      -  `kafka-console-consumer --bootstrap-server kafka_zookeeper_compose-kafka-1-1:29092,kafka_zookeeper_compose-kafka-2-1:29093,kafka_zookeeper_compose-kafka-3-1:29094 --topic gom   --group zero`
   
