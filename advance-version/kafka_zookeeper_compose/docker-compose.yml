@@ -1,78 +1,119 @@
 services:
+  ########################
+  # Zookeeper Setting
+  ########################
   zookeeper-1:
-    image: confluentinc/cp-zookeeper:latest
+    image: confluentinc/cp-zookeeper:latest    
     ports:
-      - "2181:2181"
+      - 2181:2181
+      - 22888:22888
+      - 23888:23888
+    volumes:
+      - ./zookeeper/data/1:/zookeeper/data  
     environment:
+      # ZooKeeper 클라이언트가 연결할 포트
       ZOOKEEPER_CLIENT_PORT: 2181
+      # ZooKeeper 서버의 고유 ID
       ZOOKEEPER_SERVER_ID: 1
-      ZOOKEEPER_SERVERS: zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888
+      # 클러스터 내 ZooKeeper가 서로 통신할 때 사용하는 호스트명과 포트 설정
+      # ㄴ> 설정은 호스트명:클라이언트포트:투표포트 형식으로 각 서버의 상호 통신을 지정합니다.
+      ZOOKEEPER_SERVERS: zookeeper-1:22888:23888;zookeeper-2:32888:33888;zookeeper-3:42888:43888
 
   zookeeper-2:
     image: confluentinc/cp-zookeeper:latest
     ports:
-      - "2182:2182"
+      - 2182:2182
+      - 32888:32888
+      - 33888:33888
+    volumes:
+      - ./zookeeper/data/2:/zookeeper/data   
     environment:
       ZOOKEEPER_CLIENT_PORT: 2182
       ZOOKEEPER_SERVER_ID: 2
-      ZOOKEEPER_SERVERS: zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888
+      ZOOKEEPER_SERVERS: zookeeper-1:22888:23888;zookeeper-2:32888:33888;zookeeper-3:42888:43888
 
   zookeeper-3:
     image: confluentinc/cp-zookeeper:latest
     ports:
-      - "2183:2183"
+      - 2183:2183
+      - 42888:42888
+      - 43888:43888
+    volumes:
+      - ./zookeeper/data/3:/zookeeper/data     
     environment:
       ZOOKEEPER_CLIENT_PORT: 2183
       ZOOKEEPER_SERVER_ID: 3
-      ZOOKEEPER_SERVERS: zookeeper-1:2888:3888;zoozookeeper-2:2888:3888;zookeeper-3:2888:3888
+      ZOOKEEPER_SERVERS: zookeeper-1:22888:23888;zookeeper-2:32888:33888;zookeeper-3:42888:43888
+
+  ########################
+  # Kafka Setting
+  ########################
 
   kafka-1:
     image: confluentinc/cp-kafka:latest
-    ports:
-      - "9092:9092"
-      - "29092:29092"
-    environment:
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-1:19092,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,DOCKER://host.docker.internal:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2182,zookeeper-3:2183"
-      KAFKA_BROKER_ID: 1
     depends_on:
       - zookeeper-1
       - zookeeper-2
       - zookeeper-3
-
+    ports:
+      - 9092:9092
+      - 19092:19092
+      - 29092:29092
+    volumes:
+      - ./kafka/logs/1:/kafka  
+    environment:
+      # 클라이언트가 접근할 수 있는 리스너의 URL을 정의합니다. 각 프로토콜에 대해 호스트와 포트를 지정합니다.
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-1:19092,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,DOCKER://host.docker.internal:29092
+      # 각 리스너에 대한 보안 프로토콜을 매핑
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT
+      # 브로커 간 통신에 사용되는 리스너의 이름을 지정
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL 
+      # 브로커가 연결할 ZooKeeper 주소를 지정
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2182,zookeeper-3:2183"
+      # 브로커의 고유 ID
+      KAFKA_BROKER_ID: 1
+    
   kafka-2:
     image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
     ports:
-      - "9093:9093"
-      - "29093:29093"
+      - 9093:9093
+      - 19093:19093
+      - 29093:29093
+    volumes:
+      - ./kafka/logs/2:/kafka   
     environment:
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-2:19093,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9093,DOCKER://host.docker.internal:29093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2182,zookeeper-3:2183"
       KAFKA_BROKER_ID: 2
+    
+  kafka-3:
+    image: confluentinc/cp-kafka:latest
     depends_on:
       - zookeeper-1
       - zookeeper-2
       - zookeeper-3
-
-  kafka-3:
-    image: confluentinc/cp-kafka:latest
     ports:
-      - "9094:9094"
-      - "29094:29094"
+      - 9094:9094
+      - 19094:19094
+      - 29094:29094
+    volumes:
+      - ./kafka/logs/3:/kafka     
     environment:
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-3:19094,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9094,DOCKER://host.docker.internal:29094
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2182,zookeeper-3:2183"
       KAFKA_BROKER_ID: 3
-    depends_on:
-      - zookeeper-1
-      - zookeeper-2
-      - zookeeper-3
+
+  ########################
+  # UI Setting
+  ########################
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -82,7 +123,7 @@ services:
       - kafka-2
       - kafka-3
     ports:
-      - 8080:8080
+      - 7777:8080
     environment:
       - DYNAMIC_CONFIG_ENABLED=true
       - KAFKA_CLUSTERS_0_NAME=peters_kafka
