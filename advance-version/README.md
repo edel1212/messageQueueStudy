@@ -26,3 +26,12 @@
 - Producer가 보낸 데이터들이 파티션에 들어가 저장되고 이 데이터를 레코드라고 부른다.
   
   ![image](https://github.com/edel1212/messageQueueStudy/assets/50935771/1a1b5934-8f14-485d-8674-5d558eb0e41a)
+
+
+### 커멘드 사용 시 주의  
+- `BootStrap-Server`정보 또한 `","`를 사용해서 여러개 등록이 가능하다.
+  - 네트워크 주소는 컨테이너명으로 지정해줘야한다.
+  - Port는 Docker-Compose 내 설정한 Port로 작성해줘야한다.
+- 예시
+  - `kafka-console-producer --bootstrap-server localhost:29092,kafka_zookeeper_compose-kafka-2-1:29093,kafka_zookeeper_compose-kafka-3-1:29094 --topic gom`   
+  
