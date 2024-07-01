@@ -37,7 +37,7 @@
       - `kafka-console-consumer.sh --bootstrap-server [ Kafka Broker 도메인 ] --topic [구독할 topic 이름]`
     - 이전 메세지까지 확인 (`--from-beginning`)
       - `kafka-console-consumer.sh --bootstrap-server [ Kafka Broker 도메인 ] --topic [구독할 topic 이름] --from-beginning`
-    - 확인한 메세지 안보이게 (`--from-beginning`)
+    - 확인한 메세지 안보이게 (`--group [ 그룹 지정 ]`)
       - `kafka-console-consumer.sh --bootstrap-server [ Kafka Broker 도메인 ] --topic [구독할 topic 이름] --group [ 그룹 지정 ]`
   ```properties
   services:
