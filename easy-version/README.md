@@ -174,7 +174,11 @@
 - `Dependencies` 추가 이후 내가 Comsumer 설정 값을 지정 후 불러오는 방식이다.
 - 메세지를 가져올 때 (`consumer.poll()`) 시 최대 대기시간을 지정해줘야한다.
   - CPU 및 네트워크 자원의 효율적인 사용, 컨슈머의 응답성 조절, 유휴 시간 방지 및 리밸런싱 처리를 위함
+<<<<<<< HEAD
 
+=======
+- 예시 코드
+>>>>>>> f79a2428a345b9edaa12b803647268e82b52108c
 ```java
 @Service
 @Log4j2
@@ -191,12 +195,21 @@ public class KafkaOnDemandService {
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
             consumer.subscribe(Collections.singletonList("foo"));
 
+<<<<<<< HEAD
             while (true) { // 계속해서 메시지를 가져오는 무한 루프
                 /**
                  * Kafka 소비자가 서버에서 메시지를 가져올 때 최대 대기 시간을 지정하는 방법입니다.
                  *  이를 통해 CPU 및 네트워크 자원의 효율적인 사용, 컨슈머의 응답성 조절, 유휴 시간 방지
                  *  , 리밸런싱 처리 등의 장점을 얻을 수 있습니다.
                  *  이러한 이유들로 poll 메서드의 타임아웃 값은 Kafka 컨슈머 애플리케이션에서 중요한 설정 요소입니다.
+=======
+            // 메세지가 들어올 때까지 Loop
+            while (true) {
+                /**
+                 * ℹ️ Duration 지정이유
+                 *   - CPU 및 네트워크 자원의 효율적인 사용, 컨슈머의 응답성 조절, 유휴 시간 방지
+                 *    리밸런싱 처리 등의 장점을 얻을 수 있습니다
+>>>>>>> f79a2428a345b9edaa12b803647268e82b52108c
                  * */
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
 
@@ -206,11 +219,23 @@ public class KafkaOnDemandService {
                             record.key(), record.value(), record.partition(), record.offset());
                     log.info("---------------------");
 
+<<<<<<< HEAD
                     // 메시지 하나를 처리한 후 커밋
+=======
+                    /**
+                     * ℹ️ 메시지 하나를 처리한 후 커밋 - 동기식으로 처리로 정확한 처리를 보장
+                     *      - 비동기 식으로 처리를 원할 경우 consumer.commitASync(); 사용
+                     *      - 파라미터 미사용 시 전체가 커밋 된다.
+                     * **/
+>>>>>>> f79a2428a345b9edaa12b803647268e82b52108c
                     consumer.commitSync(Collections.singletonMap(
                               new TopicPartition(record.topic(), record.partition())
                             , new OffsetAndMetadata(record.offset() + 1)));
 
+<<<<<<< HEAD
+=======
+                    consumer.commitAsync();
+>>>>>>> f79a2428a345b9edaa12b803647268e82b52108c
                     // 메시지 하나만 가져오기 위해 루프 종료
                     return;
                 } // for
