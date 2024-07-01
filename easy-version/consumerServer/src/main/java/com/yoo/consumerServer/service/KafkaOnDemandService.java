@@ -25,12 +25,12 @@ public class KafkaOnDemandService {
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
             consumer.subscribe(Collections.singletonList("foo"));
 
-            while (true) { // 계속해서 메시지를 가져오는 무한 루프
+            // 메세지가 들어올 때까지 Loop
+            while (true) {
                 /**
-                 * Kafka 소비자가 서버에서 메시지를 가져올 때 최대 대기 시간을 지정하는 방법입니다.
-                 *  이를 통해 CPU 및 네트워크 자원의 효율적인 사용, 컨슈머의 응답성 조절, 유휴 시간 방지
-                 *  , 리밸런싱 처리 등의 장점을 얻을 수 있습니다.
-                 *  이러한 이유들로 poll 메서드의 타임아웃 값은 Kafka 컨슈머 애플리케이션에서 중요한 설정 요소입니다.
+                 * ℹ️ Duration 지정이유
+                 *   - CPU 및 네트워크 자원의 효율적인 사용, 컨슈머의 응답성 조절, 유휴 시간 방지
+                 *    리밸런싱 처리 등의 장점을 얻을 수 있습니다
                  * */
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
 
@@ -40,11 +40,16 @@ public class KafkaOnDemandService {
                             record.key(), record.value(), record.partition(), record.offset());
                     log.info("---------------------");
 
-                    // 메시지 하나를 처리한 후 커밋
+                    /**
+                     * ℹ️ 메시지 하나를 처리한 후 커밋 - 동기식으로 처리로 정확한 처리를 보장
+                     *      - 비동기 식으로 처리를 원할 경우 consumer.commitASync(); 사용
+                     *      - 파라미터 미사용 시 전체가 커밋 된다.
+                     * **/
                     consumer.commitSync(Collections.singletonMap(
                               new TopicPartition(record.topic(), record.partition())
                             , new OffsetAndMetadata(record.offset() + 1)));
 
+                    consumer.commitAsync();
                     // 메시지 하나만 가져오기 위해 루프 종료
                     return;
                 } // for

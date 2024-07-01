@@ -1,4 +1,5 @@
 # Kafka 간단한 사용 예제
+
 ```properties
 # ℹ️ 간단한 방법 사용 예제
 #     - Docker Compose를 사용해서 구동함
@@ -7,17 +8,19 @@
 
 - `Kafka Brokder`는 기본적으로 9022 포트에서 구동된다.
 - `Zookeeper` 서버가 구동된 상태일때만 Kafka Broker 구동이 가능 하다.
-  - `Zookeeper`가 메타 데이터를 관리해 주기 떄문이다.  
+  - `Zookeeper`가 메타 데이터를 관리해 주기 떄문이다.
 
 ### Zookeeper 및 Kafka 실행
+
 ```properties
 ## ℹ️ Docker를사용해서 테스트를 진행함
 ```
-- 접근 
+
+- 접근
   - `docker exec -it {{container_name}} /bin/bash`
 - ℹ️ Producer
   - Topic 생성
-    - `kafka-topics.sh --create --topic [ 생성할 topic명 ] --bootstrap-server [ Kafka Broker 도메인 ] --partitions [ 분할 파티션 개수 ]`  
+    - `kafka-topics.sh --create --topic [ 생성할 topic명 ] --bootstrap-server [ Kafka Broker 도메인 ] --partitions [ 분할 파티션 개수 ]`
   - Topic 목록 확인
     - `kafka-topics.sh --bootstrap-server [ Kafka Broker 도메인 ] --list`
   - Topic 접근 (메세지 등록)
@@ -51,7 +54,8 @@
         KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
   ```
 
-### SpringBoot Flow 
+### SpringBoot Flow ( 구독 후 메세지를 받는 방식 )
+
 ```properties
 ## ℹ️ 간단한 메세지 전송 , 지정 Topic 수신 형식으로 진행
 ##    - 2개의 서버를 구동하여 테스트 ( Producer Server, Consumer Server )
@@ -59,12 +63,14 @@
 ```
 
 #### Producer Server
+
 - Dependencies
   ```groovy
   implementation 'org.springframework.kafka:spring-kafka'
   testImplementation 'org.springframework.kafka:spring-kafka-test'
   ```
 - Kafka 설정
+
   ```java
   @Configuration
   public class KafkaProducerConfig {
@@ -105,12 +111,14 @@
   ```
 
 #### Consumer Server
+
 - Dependencies
   ```groovy
   implementation 'org.springframework.kafka:spring-kafka'
   testImplementation 'org.springframework.kafka:spring-kafka-test'
   ```
 - Kafka 설정
+
   ```java
   @Configuration
   public class KafkaConsumerConfig {
@@ -155,3 +163,63 @@
       }
   }
   ```
+
+### SpringBoot Flow ( on-demand 방식 )
+
+```properties
+# ℹ️ Conrtoller를 제외하고 비즈니스 로직인 Service만 예시로 작성함
+```
+
+- 사용자의 요청이 들어오면 메세지를 한 건식 확인 하는 형식
+- `Dependencies` 추가 이후 내가 Comsumer 설정 값을 지정 후 불러오는 방식이다.
+- 메세지를 가져올 때 (`consumer.poll()`) 시 최대 대기시간을 지정해줘야한다.
+  - CPU 및 네트워크 자원의 효율적인 사용, 컨슈머의 응답성 조절, 유휴 시간 방지 및 리밸런싱 처리를 위함
+
+```java
+@Service
+@Log4j2
+public class KafkaOnDemandService {
+    public void onDemandMessage(){
+        Properties props = new Properties();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG           , "localhost:9092");
+        props.put(ConsumerConfig.GROUP_ID_CONFIG                    , "abc");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG      , StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG    , StringDeserializer.class);
+        // Auto commit 비활성화
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG          , false);
+
+        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
+            consumer.subscribe(Collections.singletonList("foo"));
+
+            while (true) { // 계속해서 메시지를 가져오는 무한 루프
+                /**
+                 * Kafka 소비자가 서버에서 메시지를 가져올 때 최대 대기 시간을 지정하는 방법입니다.
+                 *  이를 통해 CPU 및 네트워크 자원의 효율적인 사용, 컨슈머의 응답성 조절, 유휴 시간 방지
+                 *  , 리밸런싱 처리 등의 장점을 얻을 수 있습니다.
+                 *  이러한 이유들로 poll 메서드의 타임아웃 값은 Kafka 컨슈머 애플리케이션에서 중요한 설정 요소입니다.
+                 * */
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+
+                for (ConsumerRecord<String, String> record : records) {
+                    log.info("---------------------");
+                    log.info("Received message: Key - {}, Value - {}, Partition - {}, Offset - {}",
+                            record.key(), record.value(), record.partition(), record.offset());
+                    log.info("---------------------");
+
+                    // 메시지 하나를 처리한 후 커밋
+                    consumer.commitSync(Collections.singletonMap(
+                              new TopicPartition(record.topic(), record.partition())
+                            , new OffsetAndMetadata(record.offset() + 1)));
+
+                    // 메시지 하나만 가져오기 위해 루프 종료
+                    return;
+                } // for
+            } // while
+
+        } catch (Exception e){
+            e.printStackTrace();
+            // TODO Exception 처리
+        } // try - catch
+    }
+}
+```
