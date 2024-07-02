@@ -46,6 +46,11 @@
   - 사용 이유
     -  리더는 항상 정상적으로 동작해야 한다. 하지만 어떻게 그렇게 할 수 있을까? 리더도 똑같은 브로커 중 하나일 뿐인데 장애가 발생했을 때 처리를 위함이다.
 
+- #### ISR(In-Sync Replication)
+  - `Replication`을 나눠 놓은 각각의 Leader 혹은 Flower들을 모아 놓은 Group 이다.
+
+    ![img1 daumcdn](https://github.com/edel1212/messageQueueStudy/assets/50935771/397adb2c-b574-4487-9786-cd974f2d42e1)
+    
 ### 커멘드 사용 시 주의  
 - `BootStrap-Server`정보 또한 `","`를 사용해서 여러개 등록이 가능하다.
   - 네트워크 주소는 컨테이너명으로 지정해줘야한다.
