@@ -22,7 +22,9 @@
 ### 파티션(Partition)이 란?
 - 데이터를 효율적으로 처리하는 데 필수적인 역할을 한다
 - 각각의 파티션은 독립적인 데이터 스트림을 형성하며, 이를 통해 메시지가 병렬로 처리될 수 있다.
-- Topic을 이루고 있는 단위이
+- Topic을 이루고 있는 단위다
+  - Topic 안에 여러 개의 파티션을 가질 수 있다.(즉, 파티션이란 토픽을 분할한 것이라 할 수 있다.)
+- 처음 생성한 이후로는 추가할 수만 있고, 줄일 수는 없다는 특징이 있다.
 - Producer가 보낸 데이터들이 파티션에 들어가 저장되고 이 데이터를 레코드라고 부른다.
   
   ![image](https://github.com/edel1212/messageQueueStudy/assets/50935771/1a1b5934-8f14-485d-8674-5d558eb0e41a)
@@ -37,6 +39,10 @@
 
 - replication 설정 수가 많아지면 그만큼 데이터의 복제로 인한 성능 하락이 있을 수 있기 때문에 무조건 크게 설정하는 것이 권장되지는 않는다.
   - 설정 수를 높이는건 쉽지만 높여 놓은 설정을 다시 낮추는건 어려우니 상황에 맞게 점차적으로 올려가면서 맞추는게 중요하다.
+- 흐름
+
+  <img width="837" alt="211142238-ef4c58a3-d488-41f5-9ebb-4663d9643feb" src="https://github.com/edel1212/messageQueueStudy/assets/50935771/bf0c9df3-24d5-41dc-98ff-27d711733d04">
+
 
 - #### Leader & Follower  
   - 역할 
@@ -50,6 +56,41 @@
   - `Replication`을 나눠 놓은 각각의 Leader 혹은 Flower들을 모아 놓은 Group 이다.
 
     ![img1 daumcdn](https://github.com/edel1212/messageQueueStudy/assets/50935771/397adb2c-b574-4487-9786-cd974f2d42e1)
+
+### Lag란?
+- Poducer가 데이터를 넣고 Cousumer가 데이터를 데이터를 읽을 경우 이 차이(Offset 차이)를 말한다.
+
+  <img width="1023" alt="211139263-ccb27719-6b14-42d0-9fea-b41283461794" src="https://github.com/edel1212/messageQueueStudy/assets/50935771/3c542364-d0a9-4515-9a73-c26af0e101ba">
+
+- Kafka에서 Lag 값을 통해 Producer, Consumer의 상태를 유추할 수 있다. 즉, Lag이 높다면 Consumer에 문제가 있다는 뜻일 수 있다
+
+  
+### 컨트롤러(Contoller)
+- Kafka 클러스터의 다수 브로커 중 한 대가 컨트롤러 역할을 한다. 컨트롤러는 다른 브로커들의 상태를 체크하고 브로커가 클러스터에서 빠지는 경우 해당 브로커에 존재하는 리더 파티션을 재분배한다.
+
+  ![image](https://github.com/edel1212/messageQueueStudy/assets/50935771/cc62f245-86f2-422b-9b8f-f06f51d529d0)
+
+### Consumer 대표 옵션
+- group.id
+  - 컨슈머가 속한 컨슈머 그룹을 식별하는 식별자이다 Group이 지정되면 같은 그룹끼리 확인한 메세지는 보이지 않는다
+- enable.auto.commit
+  - 백그라운드로 주기적으로 오프셋(`offset`)을 커밋한다.
+  - 기본 값: true
+- auto.offset.reset
+  - Kafka에서 초기 오프셋이 없거나 현재 오프셋이 더 이상 존재하지 않은 경우(데이터가 삭제)에 다음 옵션으로 리셋한다.
+    - earliest: 가장 초기의 오프셋값으로 설정한다.
+    - latest: 가장 마지막의 오프셋값으로 설정한다.(기본 값)
+    - none: 이전 오프셋값을 찾지 못하면 에러를 나타낸다
+- max.poll.records
+  - 단일 호출 poll()에 대한 최대 레코드 수를 조정한다.
+  - 기본 값은 500 이다.
+- max.poll.interval.ms
+  - 해당 옵션 시간 만큼 컨슈머 그룹에서 컨슈머가 살아 있지만 poll() 메소드를 호출하지 않을 때 장애라고 판단하여 컨슈머 그룹에서 제외 후 다른 컨슈머에게 전달
+  - 기본 값: 5분
+- auto.commit.interval.ms
+  - 주기적으로 오프셋을 커밋하는 시간
+  - 기본 값: 5초
+
     
 ### 커멘드 사용 시 주의  
 - `BootStrap-Server`정보 또한 `","`를 사용해서 여러개 등록이 가능하다.
