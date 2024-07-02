@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 
 @Configuration
 public class KafkaConsumerConfig {
-
     @Bean
     public ConsumerFactory<String, Object> consumerFactory() {
         Map<String, Object> config = new HashMap<>();
@@ -26,11 +25,6 @@ public class KafkaConsumerConfig {
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "group_100");
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-
-        // 타임아웃 값 증가
-        config.put("request.timeout.ms", "120000"); // 요청 타임아웃 증가
-        config.put("session.timeout.ms", "30000"); // 세션 타임아웃 조정
-        config.put("heartbeat.interval.ms", "10000"); // 하트비트 간격 조정
 
         return new DefaultKafkaConsumerFactory<>(config);
     }

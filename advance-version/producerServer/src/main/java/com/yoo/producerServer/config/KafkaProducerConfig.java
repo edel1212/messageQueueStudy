@@ -38,6 +38,12 @@ public class KafkaProducerConfig {
         return new KafkaTemplate<>(producerFactory());
     }
 
+    /**
+     * Topic을 생성함
+     * - 배열 형태로도 가능하다
+     *
+     * @return the kafka admin . new topics
+     */
     @Bean
     public KafkaAdmin.NewTopics newTopics() {
         // ℹ️ 배열 형태로도 등록 가능 TopicBuilder.name("a").build(), TopicBuilder.name("b").build();

@@ -6,10 +6,11 @@ import org.springframework.stereotype.Component;
 @Component
 @Log4j2
 public class KafkaConsumerService {
+    // topics명을 지정하여 확인
     @KafkaListener(topics = "gom")
     public void listener(Object data) {
        log.info("--------------------");
-       log.info("Group Name :: group_1");
+       log.info("Group Name :: group_10");
        log.info("Topic Name :: gom");
         log.info("data :: {}", data);
        log.info("--------------------");
