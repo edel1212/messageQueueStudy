@@ -92,7 +92,7 @@
   - 기본 값: 5초
 
     
-### 커멘드 사용 시 주의  
+### 커멘드 사용 시 주의 사항 
 - `BootStrap-Server`정보 또한 `","`를 사용해서 여러개 등록이 가능하다.
   - 네트워크 주소는 컨테이너명으로 지정해줘야한다.
   - Port는 Docker-Compose 내 설정한 내부용 Port로 작성해줘야한다.
@@ -107,4 +107,77 @@
       -  `kafka-console-consumer --bootstrap-server kafka_zookeeper_compose-kafka-1-1:29092,kafka_zookeeper_compose-kafka-2-1:29093,kafka_zookeeper_compose-kafka-3-1:29094 --topic gom   --group zero`
    
 
-  
+### SpringBoot Flow
+
+```properties
+# ℹ️ 간단한 구조로 진행하였으며, dependencies는 생략하였다 ( easy-version ) 확인
+```
+
+#### Producer Server
+
+- Config
+  - `BOOTSTRAP_SERVERS_CONFIG` 설정은 Cluster로 구성할 경우 다수의 Broker는 `","`를 사용해서 지정 가능하다.
+  - Topic 생성 시 `new KafkaAdmin.NewTopics`를 사용해 만들 경우 배열 형태로 다수의 Topic 생성이 가능하다.
+  ```java
+  @Configuration
+  public class KafkaProducerConfig {
+    @Bean
+    public ProducerFactory<String, Object> producerFactory() {
+        Map<String, Object> config = new HashMap<>();
+        /**
+         * ℹ️ 같은 Kafka Cluster에 속해있는 Broker들을 ,(반점)으로 구분하여 여러개 기입이 가능하다
+         * */
+        final String  BOOTSTRAP_SERVER_LIST = List.of("localhost:9092","localhost:9093","localhost:9094")
+                                                    .stream().collect(Collectors.joining(","));
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVER_LIST);
+        // 직렬화 메커니즘 설정
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        return new DefaultKafkaProducerFactory<>(config);
+    }
+
+    @Bean
+    public KafkaTemplate<String, Object> kafkaTemplate() {
+        return new KafkaTemplate<>(producerFactory());
+    }
+
+    /**
+     * Topic을 생성함
+     * - 배열 형태로도 가능하다
+     *
+     * @return the kafka admin . new topics
+     */
+    @Bean
+    public KafkaAdmin.NewTopics newTopics() {
+        // ℹ️ 배열 형태로도 등록 가능 TopicBuilder.name("a").build(), TopicBuilder.name("b").build();
+        return new KafkaAdmin.NewTopics(
+                // Topic명 지정
+                TopicBuilder.name("gom")
+                        // 파티션 수 지정
+                        .partitions(3)
+                        // 복제본
+                        .replicas(2)
+                        // 데이터 보존 시간 - 무기한 저장을 원할 경우 -1로 지정
+                        .config(TopicConfig.RETENTION_MS_CONFIG, String.valueOf(1000 * 60 * 60))
+                        .build()
+        );
+    }
+
+  }
+  ```
+- Controller
+  ```java
+  @RequiredArgsConstructor
+  @RestController
+  @RequestMapping("/api")
+  public class ProducerController {
+      private final KafkaTemplate<String, Object> kafkaTemplate;
+      @GetMapping
+      public ResponseEntity sendData(String data){
+          // KafkaProducerConfig에서 미리 생성한 Topic 명임
+          String topic = "gom";
+          kafkaTemplate.send(topic, data);
+          return ResponseEntity.ok().body("Success");
+      }
+  }
+  ```
