@@ -38,8 +38,7 @@
 - 디커플링(Decoupling):
   - 시스템의 컴포넌트 간 결합도를 낮춰 독립적으로 개발, 테스트, 배포할 수 있게 해줍니다. 이는 복잡한 시스템을 더 쉽게 관리하고 유지보수할 수 있도록 합니다.
 
-### 메세지 브로커 / 이벤트 브로커
-데이터를 운반하는 방식에 따라 메세지 브로커 와 이벤트 브로커 로 나눌 수 있다.
+### 데이터 운방 방식
 - `메세지 브로커(Message Broker)` 방식
   - `Message Broker`는 `Event Broker`의 기능을 하지 못합니다  
   - Producer가 생산한 메세지를 메세지 큐에 저장, 저장된 메세지를 Consumer가 가져가는 형식이로 메세지 브로커는 Consumer가 메세지 큐에서 데이터를 가져가게 되면 짧은 시간 내에 메세지 큐에서 삭제된다.
@@ -73,6 +72,12 @@
 - Amazon SQS (Simple Queue Service)
   - AWS에서 제공하는 관리형 메시지 큐 서비스로, 고가용성과 확장성을 제공.  
 
+
+### Kafka 사용 예시
+- 간단한 방법 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/easy-version)
+  - 경량화된 Kafa, Zookeeper를 사용하여 Producer, Conuser 사용
+- Cluster 방법 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/advance-version)
+  - 3개의 Borkder, Zookeeper를 이용하여 Cluster 구성과 파티셔닝 및 복제 사용
 
 ### Kafka 사용 시 헷갈렸던 개념
 - `Producer`가 등록한 `Topic`에 메세지를 넣는 개념이다
