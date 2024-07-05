@@ -1,6 +1,7 @@
 package com.yoo.producerServer.config;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.RoundRobinPartitioner;
 import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.context.annotation.Bean;
@@ -27,6 +28,8 @@ public class KafkaProducerConfig {
         final String  BOOTSTRAP_SERVER_LIST = List.of("localhost:9092","localhost:9093","localhost:9094")
                                                     .stream().collect(Collectors.joining(","));
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVER_LIST);
+        // ℹ️ Batch 사이즈 수정으로 한쪽으로 파티션으로 메세지가 몰리는 이슈 수정
+        config.put(ProducerConfig.BATCH_SIZE_CONFIG, 1);
         // 직렬화 메커니즘 설정
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
@@ -49,9 +52,9 @@ public class KafkaProducerConfig {
         // ℹ️ 배열 형태로도 등록 가능 TopicBuilder.name("a").build(), TopicBuilder.name("b").build();
         return new KafkaAdmin.NewTopics(
                 // Topic명 지정
-                TopicBuilder.name("gom")
+                TopicBuilder.name("round")
                         // 파티션 수 지정
-                        .partitions(3)
+                        .partitions(2)
                         // 복제본
                         .replicas(2)
                         // 데이터 보존 시간 - 무기한 저장을 원할 경우 -1로 지정
