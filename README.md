@@ -89,7 +89,31 @@
   - 소켓과 같이 모두에게 전파 될 것으로 예상 -> 하지만 틀렸음 한곳에만 나옴 반대쪽 서버를 끄면 켜있는 곧으로 넘어간다.
     - 👉 단 ! `groupId`을 지정하지 않으면 바라보는 `Topic`의 메세지를 모두가 받는다.  
     ![kafka](https://github.com/edel1212/messageQueueStudy/assets/50935771/6edbb7c7-96ea-4f84-a33b-ccf91cebc2ae)
+- `partition`을 사용했을 경우 한쪽의 `partition`에만 메세지가 쌓였던 이슈
+  - Producer쪽의 Batch Size 설정으로 해결
+    -  Batch Size란 ?
+      -  batch를 이용하면 메세지를 묶음 으로 보내기 때문에 replica처리 로직이 줄어들어 Latency를 방지 할 수 있다. 즉, 메세지 send 처리가 대기 줄일 수 있다.
+        - 쉽게 설명하면 메세지가 리더에서 한번에 처리할 수 있게 끔  모아두었다 일정 사이즈에 맞춰서 보내주기 위함이다.
+           - 따라서 너무 낮게 Size를 설정할 경우 서버에 부하가 올 수 있으니 운용 서버환경에 맞춰서 설정하는 것이 중요하다.
+         
+          ![img1 daumcdn](https://github.com/edel1212/messageQueueStudy/assets/50935771/1a87a924-1432-4efa-8d5e-a5333311f32c)
 
+     - 설정 코드
+      ```java
+      @Bean
+      public ProducerFactory<String, Object> producerFactory() {
+          Map<String, Object> config = new HashMap<>();
+          final String  BOOTSTRAP_SERVER_LIST = List.of("localhost:9092","localhost:9093","localhost:9094")
+                                                      .stream().collect(Collectors.joining(","));
+          config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVER_LIST);
+          // ℹ️ Batch 사이즈 수정으로 한쪽으로 파티션으로 메세지가 몰리는 이슈 수정
+          config.put(ProducerConfig.BATCH_SIZE_CONFIG, 1);
+          // 직렬화 메커니즘 설정
+          config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+          config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+          return new DefaultKafkaProducerFactory<>(config);
+      }
+      ```
 
 
 
