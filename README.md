@@ -128,6 +128,27 @@
       
      ![img1 daumcdn](https://github.com/edel1212/messageQueueStudy/assets/50935771/32f16cd8-5dc3-4c00-9067-5171f5fd6f89)
 
+  -  출력 값
+    
+      ```properties
+      ## 컨슈머 콘솔 명령어
+      /usr/local/kafka/bin/kafka-console-consumer.sh \
+      --bootstrap-server peter-kafka001:9092,peter-kafka002:9092,peter-kafka003:9092 \
+      --topic peter-01 \
+      --from-beginning
+      
+      출력 
+      a
+      d
+      1
+      4
+      b
+      e
+      2
+      5
+      c
+      3
+      ```
     
 
     
