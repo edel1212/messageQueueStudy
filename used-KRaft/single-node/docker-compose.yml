@@ -1,0 +1,54 @@
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-kraft
+    ports:
+      - "9092:9092"
+    environment:
+      # ==========================================
+      # [1] KRaft 모드 핵심 설정 (주키퍼 대체)
+      # ==========================================
+
+      # KAFKA_NODE_ID: 이 서버의 고유 번호입니다.
+      # 만약 서버를 3대 띄우는 '클러스터'였다면 각각 1, 2, 3을 부여했을 겁니다.
+      KAFKA_NODE_ID: 1
+
+      # KAFKA_PROCESS_ROLES: 이 노드가 할 역할입니다.
+      # broker(데이터를 받고 저장하는 본연의 역할)와
+      # controller(클러스터의 상태를 관리하는 역할, 예전 주키퍼가 하던 일)를 이 서버 혼자 다 하겠다는 뜻입니다.
+      KAFKA_PROCESS_ROLES: "broker,controller"
+
+      # KAFKA_CONTROLLER_QUORUM_VOTERS: "이 클러스터를 지휘하는 컨트롤러가 누구냐?"를 적어줍니다.
+      # '노드ID@접속주소:포트' 형식입니다. 나 자신(1번 노드)이 컨트롤러이므로 내 주소를 적습니다.
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:29093"
+
+      # ==========================================
+      # [2] 네트워크 / 통신 설정
+      # ==========================================
+
+      # KAFKA_LISTENERS: 서버가 어떤 포트로 요청을 기다릴지(Listen) 설정합니다.
+      # 9092번 포트는 외부 클라이언트(우리의 Spring 앱 등)가 데이터를 보낼 때 쓰고,
+      # 29093번 포트는 내부적으로 컨트롤러 통신을 할 때 씁니다. (0.0.0.0은 모든 IP의 접근을 허용한다는 뜻)
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093"
+
+      # KAFKA_ADVERTISED_LISTENERS: 외부 클라이언트에게 "나한테 접속하려면 이 주소로 와라"고 알려주는 간판입니다.
+      # 로컬 PC에서 테스트할 것이므로 localhost:9092를 알려줍니다.
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://localhost:9092"
+
+      # 아래 세 줄은 위에서 정의한 'PLAINTEXT'와 'CONTROLLER'라는 리스너 이름이
+      # 보안 없이 평문(PLAINTEXT)으로 통신하겠다는 것을 서로 매핑해 주는 단순 설정입니다.
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+
+      # ==========================================
+      # [3] 저장소 및 클러스터 식별 설정
+      # ==========================================
+
+      # KAFKA_LOG_DIRS: 실제 메시지 데이터와 설정 파일들이 컨테이너 내부의 어느 폴더에 저장될지 지정합니다.
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+
+      # CLUSTER_ID: 이 Kafka 시스템의 고유 ID입니다.
+      # KRaft 모드에서는 시스템을 처음 띄울 때 고유한 클러스터 ID가 반드시 필요합니다.
+      # (아무 Base64 문자열이나 넣어도 작동합니다)
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
