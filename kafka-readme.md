@@ -13,6 +13,8 @@
   - `Consumer`가 데이터를 어디까지 읽었는지 추적하는 용도
 - `Replica` : 파티션의 복제본. 특정 Broker에 장애가 발생해도 다른 Broker에 저장된 복제본을 통해 데이터 유실 없이 서비스를 지속할 수 있게 함
 - `Consumer` : 토픽의 파티션에 저장된 메시지를 읽어와서 처리하는 주체
+  - `Topic`에 등록한 메세지는 `Conumer`가 읽는다고 **사라지는게 아님**
+  - 전통적인 메시지 큐 시스템과는 **다르게 설계**되었기 때문이다. **Kafka는 로그를 기반으로 하는 메시징 시스템이다.**
 - `Consumer Group` : 토픽의 데이터를 병렬로 분담해서 처리하기 위해 묶어 놓은 Consumer들의 집합. 
   - 하나의 파티션은 동일 그룹 내에서 오직 한 개의 Consumer만 접근 가능하여 중복 처리를 방지함
   - ✅ 하나의 메세지를 다양하게 처리하기 위해서는 그만큼의 `Consumer Group`을 만들어줘야 함
@@ -25,40 +27,19 @@
 
 
 
-## Kafka 사용 시 헷갈렸던 개념
-- ### `Producer`가 등록한 `Topic`에 메세지를 넣는 개념이다
-    - **카프카 클러스터의 브로커에서 데이터를 관리할 때 기준이 되는 개념**
-- ### `Topic`에 등록한 메세지는 따로 Conumer가 읽는다고 사라지는게 아니다.
-    - Kafak는 전통적인 메시지 큐 시스템과는 **다르게 설계**되었기 때문 전통적인 큐 시스템에서는 메시지를 소비하면 메시지가 큐에서 제거되나 **Kafka는 로그를 기반으로 하는 메시징 시스템 이기 떄문**
-        - 👉 단 ! `groupId`를 지정하면 그룹의 컨슈머들은 메시지를 중복 없이 소비하게 됩니다. 이는 Kafka의 컨슈머 그룹 관리 방식 때문이다.
-- ### Topic을 바라보고 있는 대상이 여러개일 경우 ?
-    - 소켓과 같이 모두에게 전파 될 것으로 예상 -> 하지만 틀렸음 한곳에만 나옴 반대쪽 서버를 끄면 켜있는 곧으로 넘어간다.
-        - 👉 단 ! `groupId`을 지정하지 않으면 바라보는 `Topic`의 메세지를 모두가 받는다.  
-          ![kafka](https://github.com/edel1212/messageQueueStudy/assets/50935771/6edbb7c7-96ea-4f84-a33b-ccf91cebc2ae)
+## 🚨 Producer 파티션 쏠림(Skew) 이슈와 성능 튜닝
+![img1 daumcdn](https://github.com/edel1212/messageQueueStudy/assets/50935771/1a87a924-1432-4efa-8d5e-a5333311f32c)
+- **현상**: 메시지가 여러 파티션에 골고루 분산되지 않고, 특정 **파티션에만 쏠려서 쌓이는 현상** 발생
+- **원인** (Sticky Partitioner):
+  - 카프카(v2.4 이후) 기본 파티셔너 정책 때문이다.
+  - 네트워크 통신(I/O) 효율을 높이기 위해, 하나의 파티션에 보낼 택배 상자(Batch)가 다 찰 때까지 한 파티션에만 메시지를 계속 몰아주는(Sticky) 방식을 사용하기 때문
+- **해결 및 튜닝**: `batch.size`와 `linger.ms`를 서비스 트래픽 목적에 맞게 세트로 튜닝 진행
+  - `batch.size` : 한 번에 묶어서 보낼 메시지 묶음의 최대 용량.
+  - `linger.ms` : 배치가 꽉 차지 않더라도, 브로커로 출발하기 전까지 기다려주는 최대 대기 시간.
+- **결론**: 
+  - 무작정 기본값을 쓰거나 배치 사이즈를 줄이는 것이 정답이 아니다.
+  - 대용량 로그 수집(처리량 우선)인지, 실시간 알림(지연시간 최소화)인지 시스템의 성격에 맞춰 두 설정값을 조절해야 네트워크 부하를 줄이면서 분산 밸런스 맞춰줘야 한다.
 
-
-- ### `partition`을 사용했을 경우 한쪽의 `partition`에만 메세지가 쌓였던 이슈
-    - Producer쪽의 Batch Size 설정으로 해결
-        -  Batch Size란 ?
-        - batch를 이용하면 메세지를 묶음 으로 보내기 때문에 replica처리 로직이 줄어 메세지 send 처리 대기 줄일 수 있다.
-            - 👉 적정 Batch Size 설정이 중요하다
-
-          ![img1 daumcdn](https://github.com/edel1212/messageQueueStudy/assets/50935771/1a87a924-1432-4efa-8d5e-a5333311f32c)
-
-    - 예시 코드
-
-      ```java
-      @Configuration
-      public class KafkaProducerConfig {
-          @Bean
-          public ProducerFactory<String, Object> producerFactory() {
-              Map<String, Object> config = new HashMap<>();
-              // 👉 Batch 사이즈 수정으로 한쪽으로 파티션으로 메세지가 몰리는 이슈 수정
-              config.put(ProducerConfig.BATCH_SIZE_CONFIG, 1);
-              return new DefaultKafkaProducerFactory<>(config);
-          }
-      }
-      ```
 
 - ### `partition`의 순서 보장
     - 간단하다 분산 병렬 처리를 위해서이다!
