@@ -35,33 +35,3 @@ out/
 
 ### VS Code ###
 .vscode/
-
-
-**/.DS_Store
-
-# =============================
-# Spring Boot - 모든 하위 프로젝트 적용
-# =============================
-
-# Gradle
-**/build/
-**/.gradle/
-**/gradle/wrapper/gradle-wrapper.jar
-**/gradlew.bat
-
-# Maven
-**/target/
-
-# IDE
-**/.idea/
-**/*.iml
-**/.vscode/
-
-# 환경변수
-**/.env
-**/application-local.yaml
-**/application-local.yml
-
-# OS
-**/.DS_Store
-**/Thumbs.db
