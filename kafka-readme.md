@@ -19,14 +19,6 @@
   - 하나의 파티션은 동일 그룹 내에서 오직 한 개의 Consumer만 접근 가능하여 중복 처리를 방지함
   - ✅ 하나의 메세지를 다양하게 처리하기 위해서는 그만큼의 `Consumer Group`을 만들어줘야 함
 
-## Zookeeper 사용 버전
-### 단일 노드 방식 예시 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/easy-version)
-- 경량화된 Kafa, Zookeeper를 사용하여 Producer, Conuser 사용
-### Cluster 방식 예시 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/advance-version)
-- 3개의 Borkder, Zookeeper를 이용하여 Cluster 구성과 파티셔닝 및 복제 사용
-
-
-
 ## 🚨 Producer 파티션 쏠림(Skew) 이슈와 성능 튜닝 방법
 ![img1 daumcdn](https://github.com/edel1212/messageQueueStudy/assets/50935771/1a87a924-1432-4efa-8d5e-a5333311f32c)
 - **현상**: 메시지가 여러 파티션에 골고루 분산되지 않고, 특정 **파티션에만 쏠려서 쌓이는 현상** 발생
@@ -48,3 +40,28 @@
 - **✅ 올바른 접근 (메시지 Key 라우팅):** 프로듀서가 메시지를 전송할 때 식별 가능한 **메시지 Key (예: 주문번호, 유저ID)** 지정
   - 카프카의 해시 알고리즘에 의해 **동일한 Key를 가진 메시지는 무조건 동일한 파티션에 할당** 됨.
   - **결과:** 전체 메시지는 여러 파티션으로 분산되어 빠르게 병렬 처리되면서도, "동일한 주문"이나 "동일한 유저"에 대한 상태 변경 이벤트 **순서는 완벽하게 보장**
+
+
+## ✏️ 메시지 전달 보장 수준
+> 데이터 유실을 어디까지 허용할 것인가에 대한 3가지 정책
+- At-most-once (최대 한 번):
+  - 메시지가 유실될 수 있지만, 절대 중복 처리는 하지 않음.
+  - 용도: 일부 유실되어도 무방한 단순 로그 수집.
+- At-least-once (최소 한 번) - ⭐️ 실무 기본값: 
+  - 메시지가 절대 유실되지 않음을 보장하지만, 네트워크 장애 시 중복 처리될 가능성이 있음.
+  - 용도: 일반적인 데이터 파이프라인. (수신 측에서 중복을 걸러내는 멱등성 로직 필요) 
+- Exactly-once (정확히 한 번):
+  - 유실도 없고, 중복도 없이 무조건 정확히 한 번만 처리됨.
+  - 용도: 결제, 정산 등 금융권 수준의 정합성이 필요한 시스템. (설정이 복잡하고 성능 저하가 발생할 수 있음)
+
+
+
+
+
+
+
+## Zookeeper 사용 버전
+### 단일 노드 방식 예시 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/easy-version)
+- 경량화된 Kafa, Zookeeper를 사용하여 Producer, Conuser 사용
+### Cluster 방식 예시 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/advance-version)
+- 3개의 Borkder, Zookeeper를 이용하여 Cluster 구성과 파티셔닝 및 복제 사용
