@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: kafka-single-node-producer-server
+  ## kafka 설정
+  kafka:
+    bootstrap-servers: localhost:9092 # 카프카 브로커 주소
+
+server:
+  port: 8010
