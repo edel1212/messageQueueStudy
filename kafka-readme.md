@@ -77,6 +77,32 @@
     - Redis에 있다면 ➡️ 중복 메시지이므로 DB 근처에도 가지 않고 **로직을 즉시 종료**
 
 
+## 🔍 Topic
+```shell
+# payment.request 토픽 생성
+docker exec -it kafka-kraft kafka-topics --create \
+  --bootstrap-server localhost:9092 \
+  --topic payment.request \
+  --partitions 3 \
+  --replication-factor 1
+
+# order.create 토픽 생성
+docker exec -it kafka-kraft kafka-topics --create \
+  --bootstrap-server localhost:9092 \
+  --topic order.created \
+  --partitions 3 \
+  --replication-factor 1
+
+# 생성된 토픽 목록 확인
+docker exec -it kafka-kraft kafka-topics --list --bootstrap-server localhost:9092
+```
+
+## 🔍 메시지 확인
+```shell
+# group을 바꿔가며 확인하면 값을 처음부터 확인이 가능함
+docker exec -it kafka-kraft kafka-console-consumer --bootstrap-server localhost:9092 --topic payment.request --from-beginning --group {{test-group-1}}
+```
+
 ## Zookeeper 사용 버전
 ### 단일 노드 방식 예시 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/easy-version)
 - 경량화된 Kafa, Zookeeper를 사용하여 Producer, Conuser 사용
