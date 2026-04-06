@@ -3,13 +3,13 @@ package com.yoo.kafkasinglenode.config;
 import com.yoo.kafkasinglenode.api.order.dto.OrderCreatedDto;
 import com.yoo.kafkasinglenode.api.payment.dto.PaymentRequestDto;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.serializer.JacksonJsonSerializer;
-import tools.jackson.databind.ser.jdk.StringSerializer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -20,7 +20,6 @@ public class KafkaProducerConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
-    @Bean
     private Map<String, Object> baseConfig() {
 
         Map<String, Object> config = new HashMap<>();
