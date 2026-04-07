@@ -41,6 +41,9 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
 
+      # 없는 토픽에 메세지를 보낼 경우 자동 토픽 생성 방지
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+
       # ==========================================
       # [3] 저장소 및 클러스터 식별 설정
       # ==========================================
