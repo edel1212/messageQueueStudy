@@ -52,3 +52,9 @@ services:
       # KRaft 모드에서는 시스템을 처음 띄울 때 고유한 클러스터 ID가 반드시 필요합니다.
       # (아무 Base64 문자열이나 넣어도 작동합니다)
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+
+      # 😂[삽질함] 단일 브로커(Single Node) 환경을 위한 복제 계수 최적화
+      # 카프카 내부 관리용 토픽(__consumer_offsets 등)의 기본 복제본 요구치(3)를 1로 조정하여 생성 실패 방지
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
