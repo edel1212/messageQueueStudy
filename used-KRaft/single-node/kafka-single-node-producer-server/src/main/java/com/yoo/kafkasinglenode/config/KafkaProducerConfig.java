@@ -33,13 +33,16 @@ public class KafkaProducerConfig {
 
         // 신뢰성 설정
         config.put(ProducerConfig.ACKS_CONFIG, "all");              // 모든 replica 확인 후 ack
-        config.put(ProducerConfig.RETRIES_CONFIG, 3);               // 실패 시 재시도 횟수
+        config.put(ProducerConfig.RETRIES_CONFIG, 3);               // 실패 시 재시도 횟수 (브로커 서버 및 토픽 문제가 아닐 경우)
         config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true); // 중복 전송 방지
 
         // 성능 설정
         config.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);        // 배치 사이즈 (16KB)
         config.put(ProducerConfig.LINGER_MS_CONFIG, 1);             // 배치 대기 시간 (ms)
         config.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 33554432);  // 버퍼 메모리 (32MB)
+
+        // 토픽이 존재하지 않을 경우 재시도 시간
+        config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 10_000);
 
         return config;
     }
