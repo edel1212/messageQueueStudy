@@ -80,18 +80,10 @@
 ## 🔍 Topic
 ```shell
 # payment.request 토픽 생성
-docker exec -it kafka-kraft kafka-topics --create \
-  --bootstrap-server localhost:9092 \
-  --topic payment.request \
-  --partitions 3 \
-  --replication-factor 1
+docker exec -it kafka-kraft kafka-topics --create --bootstrap-server localhost:9092 --topic payment.request --partitions 3 --replication-factor 1
 
 # order.create 토픽 생성
-docker exec -it kafka-kraft kafka-topics --create \
-  --bootstrap-server localhost:9092 \
-  --topic order.created \
-  --partitions 3 \
-  --replication-factor 1
+docker exec -it kafka-kraft kafka-topics --create --bootstrap-server localhost:9092 --topic order.created --partitions 3 --replication-factor 1
 
 # 생성된 토픽 목록 확인
 docker exec -it kafka-kraft kafka-topics --list --bootstrap-server localhost:9092
