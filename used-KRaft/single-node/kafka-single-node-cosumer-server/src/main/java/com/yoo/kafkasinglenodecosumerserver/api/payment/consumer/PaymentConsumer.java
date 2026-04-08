@@ -28,6 +28,10 @@ public class PaymentConsumer {
     public void consumePayment(PaymentRequestDto dto, Acknowledgment ack) {
         log.info("결제 메시지 Kafka 수신: {}", dto);
 
+        if("error".equals(dto.getOrderId())){
+            throw new RuntimeException("메세지 내 에러가 있습니다.");
+        }// if
+
         paymentService.payment(dto);
 
         // 로직 완료 후 커밋

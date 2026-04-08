@@ -11,6 +11,7 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
 
 import java.util.HashMap;
@@ -52,14 +53,15 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, PaymentRequestDto> paymentKafkaListenerContainerFactory() {
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentRequestDto> paymentKafkaListenerContainerFactory(DefaultErrorHandler paymentErrorHandler) {
         ConcurrentKafkaListenerContainerFactory<String, PaymentRequestDto> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(paymentConsumerFactory());
 
         // 실무 팁: 파티션 수에 맞춰 쓰레드를 늘리면 동시 처리량이 늘어납니다.
         // factory.setConcurrency(3);
-        // 예외 처리
-        // factory.setCommonErrorHandler(paymentErrorHandler());
+
+        // 예외 처리방법 등록
+        factory.setCommonErrorHandler(paymentErrorHandler);
 
         // 커밋의 제어건을 SpringBoot에 넘김
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
