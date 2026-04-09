@@ -14,7 +14,8 @@ public class OrderProducerServiceImpl implements OrderProducerService{
 
     @Override
     public void sendMessage(OrderCreatedDto dto) {
-        orderKafkaTemplate.send(TOPIC, dto.getOrderId(), dto)
+        // 🔍 주문은 Key를 전달하지 않고 메세지 전달
+        orderKafkaTemplate.send(TOPIC, dto)
                 .whenComplete((result, ex) -> {
                     if (ex != null) {
                         log.error("주문 메시지 전송 실패. orderId={}, eventId={}",

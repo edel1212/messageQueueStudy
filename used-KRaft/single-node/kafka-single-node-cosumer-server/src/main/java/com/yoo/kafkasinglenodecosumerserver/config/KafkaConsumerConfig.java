@@ -1,5 +1,6 @@
 package com.yoo.kafkasinglenodecosumerserver.config;
 
+import com.yoo.kafkasinglenodecosumerserver.api.order.dto.OrderRequestDto;
 import com.yoo.kafkasinglenodecosumerserver.api.payment.dto.PaymentRequestDto;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -38,17 +39,25 @@ public class KafkaConsumerConfig {
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class);
         // 💡 핵심: 어떤 패키지의 DTO로 역직렬화할지 허용 (보안)
         config.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "*");
+
+        // ✅ Producer 타입 헤더 무시
+        config.put(JacksonJsonDeserializer.USE_TYPE_INFO_HEADERS, false);
         return config;
     }
 
     @Bean
     public ConsumerFactory<String, PaymentRequestDto> paymentConsumerFactory() {
         Map<String, Object> config = commonConfig();
-
-        // ✅ Producer 타입 헤더 무시하고 Consumer DTO로 강제 매핑
-        config.put(JacksonJsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        // ✅ Consumer DTO로 강제 매핑
         config.put(JacksonJsonDeserializer.VALUE_DEFAULT_TYPE, PaymentRequestDto.class.getName());
+        return new DefaultKafkaConsumerFactory<>(config);
+    }
 
+    @Bean
+    public ConsumerFactory<String, OrderRequestDto> orderConsumerFactory() {
+        Map<String, Object> config = commonConfig();
+        // ✅ Consumer DTO로 강제 매핑
+        config.put(JacksonJsonDeserializer.VALUE_DEFAULT_TYPE, OrderRequestDto.class.getName());
         return new DefaultKafkaConsumerFactory<>(config);
     }
 
@@ -62,6 +71,23 @@ public class KafkaConsumerConfig {
 
         // 예외 처리방법 등록
         factory.setCommonErrorHandler(paymentErrorHandler);
+
+        // 커밋의 제어건을 SpringBoot에 넘김
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, OrderRequestDto> orderKafkaListenerContainerFactory(DefaultErrorHandler orderErrorHandler) {
+        ConcurrentKafkaListenerContainerFactory<String, OrderRequestDto> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(orderConsumerFactory());
+
+        // 실무 팁: 파티션 수에 맞춰 쓰레드를 늘리면 동시 처리량이 늘어납니다.
+        // factory.setConcurrency(3);
+
+        // 예외 처리방법 등록
+        factory.setCommonErrorHandler(orderErrorHandler);
 
         // 커밋의 제어건을 SpringBoot에 넘김
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
