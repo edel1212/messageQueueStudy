@@ -1,6 +1,5 @@
 package com.yoo.kafkasinglenodecosumerserver.config;
 
-import com.yoo.kafkasinglenodecosumerserver.api.payment.dto.PaymentRequestDto;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.TopicPartition;
@@ -57,41 +56,40 @@ public class KafkaErrorConfig {
         return config;
     }
 
+    // ✅ 1. 모든 DTO를 수용할 수 있는 단 하나의 공통 KafkaTemplate
     @Bean
-    public KafkaTemplate<String, PaymentRequestDto> paymentKafkaTemplate() {
+    public KafkaTemplate<String, Object> commonKafkaTemplate() {
         return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(baseConfig()));
     }
 
+    // ✅ 2. 단 하나의 공통 ErrorHandler
     @Bean
-    public DefaultErrorHandler paymentErrorHandler(KafkaTemplate<String, PaymentRequestDto> kafkaTemplate) {
+    public DefaultErrorHandler commonErrorHandler(KafkaTemplate<String, Object> commonKafkaTemplate) {
 
-        // ✅ 실패 메시지 → DLQ 토픽으로 자동 발행
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
-                kafkaTemplate,
+                commonKafkaTemplate,
                 (record, exception) -> {
-                    log.error("DLQ 전송 - topic: {}, offset: {}, cause: {}",
-                            record.topic(), record.offset(), exception.getMessage());
-                    // -1: 파티션을 KafkaTemplate이 자동 결정
-                    return new TopicPartition(PAYMENT_DLQ_TOPIC, -1);
+                    // 💡 핵심: 하드코딩된 상수 대신, 실패한 원본 토픽명 뒤에 ".DLQ"를 붙여 동적 라우팅
+                    String dlqTopic = record.topic() + ".DLQ";
+
+                    log.error("[{}] DLQ 전송 - offset: {}, cause: {}",
+                            dlqTopic, record.offset(), exception.getMessage());
+
+                    return new TopicPartition(dlqTopic, -1);
                 }
         );
 
-        // ✅ 재시도 정책: 1초 간격으로 최대 3회
         FixedBackOff backOff = new FixedBackOff(1_000L, 3L);
-
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, backOff);
 
-        // ✅ 재시도 없이 즉시 DLQ로 보낼 예외 (재시도해도 의미 없는 경우)
         errorHandler.addNotRetryableExceptions(
-                JsonParseException.class,       // 역직렬화 실패
-                IllegalArgumentException.class  // 비즈니스 검증 실패
+                JsonParseException.class,
+                IllegalArgumentException.class
         );
 
-        // ✅ 재시도 이벤트 로깅
         errorHandler.setRetryListeners((record, ex, deliveryAttempt) ->
                 log.warn("재시도 중 - 시도 횟수: {}/{}, topic: {}, offset: {}, cause: {}",
-                        deliveryAttempt, 3,
-                        record.topic(), record.offset(), ex.getMessage())
+                        deliveryAttempt, 3, record.topic(), record.offset(), ex.getMessage())
         );
 
         return errorHandler;

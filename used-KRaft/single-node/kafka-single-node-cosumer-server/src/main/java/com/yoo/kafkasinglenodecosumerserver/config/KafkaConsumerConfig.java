@@ -45,54 +45,43 @@ public class KafkaConsumerConfig {
         return config;
     }
 
-    @Bean
-    public ConsumerFactory<String, PaymentRequestDto> paymentConsumerFactory() {
+    // =========================================================
+    // 💡 1. [핵심] 반복되는 설정을 찍어내는 제네릭 팩토리 메서드
+    // =========================================================
+    private <T> ConsumerFactory<String, T> createConsumerFactory(Class<T> targetType) {
         Map<String, Object> config = commonConfig();
-        // ✅ Consumer DTO로 강제 매핑
-        config.put(JacksonJsonDeserializer.VALUE_DEFAULT_TYPE, PaymentRequestDto.class.getName());
+        // 파라미터로 넘어온 DTO 클래스 이름으로 역직렬화 타겟 강제 지정
+        config.put(JacksonJsonDeserializer.VALUE_DEFAULT_TYPE, targetType.getName());
         return new DefaultKafkaConsumerFactory<>(config);
     }
 
-    @Bean
-    public ConsumerFactory<String, OrderRequestDto> orderConsumerFactory() {
-        Map<String, Object> config = commonConfig();
-        // ✅ Consumer DTO로 강제 매핑
-        config.put(JacksonJsonDeserializer.VALUE_DEFAULT_TYPE, OrderRequestDto.class.getName());
-        return new DefaultKafkaConsumerFactory<>(config);
-    }
+    private <T> ConcurrentKafkaListenerContainerFactory<String, T> createContainerFactory(
+            Class<T> targetType, DefaultErrorHandler errorHandler) {
 
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, PaymentRequestDto> paymentKafkaListenerContainerFactory(DefaultErrorHandler paymentErrorHandler) {
-        ConcurrentKafkaListenerContainerFactory<String, PaymentRequestDto> factory = new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(paymentConsumerFactory());
-
-        // 실무 팁: 파티션 수에 맞춰 쓰레드를 늘리면 동시 처리량이 늘어납니다.
-        // factory.setConcurrency(3);
-
-        // 예외 처리방법 등록
-        factory.setCommonErrorHandler(paymentErrorHandler);
-
-        // 커밋의 제어건을 SpringBoot에 넘김
+        ConcurrentKafkaListenerContainerFactory<String, T> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(createConsumerFactory(targetType));
+        factory.setCommonErrorHandler(errorHandler);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
 
+        // factory.setConcurrency(3); // 필요시 활성화
         return factory;
     }
 
+    // =========================================================
+    // ✅ 2. 실제 Bean 등록 (도메인 추가 시 여기서 딱 한 줄만 추가하면 끝!)
+    // =========================================================
+
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, OrderRequestDto> orderKafkaListenerContainerFactory(DefaultErrorHandler orderErrorHandler) {
-        ConcurrentKafkaListenerContainerFactory<String, OrderRequestDto> factory = new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(orderConsumerFactory());
-
-        // 실무 팁: 파티션 수에 맞춰 쓰레드를 늘리면 동시 처리량이 늘어납니다.
-        // factory.setConcurrency(3);
-
-        // 예외 처리방법 등록
-        factory.setCommonErrorHandler(orderErrorHandler);
-
-        // 커밋의 제어건을 SpringBoot에 넘김
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
-
-        return factory;
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentRequestDto> paymentFactory(
+            DefaultErrorHandler commonErrorHandler) {
+        // PaymentRequestDto 클래스와 에러 핸들러만 넘겨서 공장 가동!
+        return createContainerFactory(PaymentRequestDto.class, commonErrorHandler);
     }
 
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, OrderRequestDto> orderFactory(
+            DefaultErrorHandler commonErrorHandler) {
+        // OrderRequestDto 클래스와 에러 핸들러만 넘겨서 공장 가동!
+        return createContainerFactory(OrderRequestDto.class, commonErrorHandler);
+    }
 }
