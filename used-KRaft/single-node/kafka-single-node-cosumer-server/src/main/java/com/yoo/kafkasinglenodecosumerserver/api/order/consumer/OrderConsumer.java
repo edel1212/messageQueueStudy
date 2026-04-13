@@ -1,4 +1,4 @@
-package com.yoo.kafkasinglenodecosumerserver.api.payment.consumer;
+package com.yoo.kafkasinglenodecosumerserver.api.order.consumer;
 
 import com.yoo.kafkasinglenodecosumerserver.api.order.dto.OrderRequestDto;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ public class OrderConsumer {
             // 그룹명
             groupId = "order-processor-group",
             // KafkaConsumerConfig에 설정된 Container Factory 명
-            containerFactory = "orderKafkaListenerContainerFactory"
+            containerFactory = "orderFactory"
     )
     public void consumeOrder(OrderRequestDto dto, Acknowledgment ack) {
         log.info("주문 메시지 Kafka 수신: {}", dto);

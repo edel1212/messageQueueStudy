@@ -23,7 +23,7 @@ public class PaymentConsumer {
             // 그룹명
             groupId = "payment-processor-group-v10",
             // KafkaConsumerConfig에 설정된 Container Factory 명
-            containerFactory = "paymentKafkaListenerContainerFactory"
+            containerFactory = "paymentFactory"
     )
     public void consumePayment(PaymentRequestDto dto, Acknowledgment ack) {
         log.info("결제 메시지 Kafka 수신: {}", dto);
