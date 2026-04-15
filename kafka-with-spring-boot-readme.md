@@ -1,7 +1,7 @@
 # SpringBoot - Kafka 사용 정리
 > Topic 생성의 경우 CLI를 통해 생성하는것이 좋다.
 
-## Produce Server
+## 기본 Produce Server <->  Consumer Server
 
 ### Producer Config
 ```java
@@ -51,7 +51,7 @@ public class KafkaProducerConfig {
 }
 ```
 
-### Producer Service
+### Producer KafkaTemplate
 > 메세지 전송 시 Key 값은 필수 값이 아님, 하지만 👍 Key가 있을 경우 같은 Partition에 위치하므로 순서가 보장됨
 ```java
 @Service
@@ -83,6 +83,7 @@ public class PaymentProducerServiceImpl implements PaymentProducerService {
 ## Consumer Server
 
 ### Consumer Config
+> 공통 설정 분리와 "createContainerFactory(공장)" 과 "createContainerFactory(일꾼)" 을 분리하여 불필요한 공통 코드 제거하여 설정
 ```java
 @EnableKafka
 @Configuration
@@ -105,40 +106,51 @@ public class KafkaConsumerConfig {
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class);
         // 💡 핵심: 어떤 패키지의 DTO로 역직렬화할지 허용 (보안)
         config.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "*");
+
+        // ✅ Producer 타입 헤더 무시
+        config.put(JacksonJsonDeserializer.USE_TYPE_INFO_HEADERS, false);
         return config;
     }
 
-    @Bean
-    public ConsumerFactory<String, PaymentRequestDto> paymentConsumerFactory() {
+    // =========================================================
+    // 💡 1. [핵심] 반복되는 설정을 찍어내는 제네릭 팩토리 메서드
+    // =========================================================
+    private <T> ConsumerFactory<String, T> createConsumerFactory(Class<T> targetType) {
         Map<String, Object> config = commonConfig();
-
-        // ✅ Producer 타입 헤더 무시하고 Consumer DTO로 강제 매핑
-        config.put(JacksonJsonDeserializer.USE_TYPE_INFO_HEADERS, false);
-        config.put(JacksonJsonDeserializer.VALUE_DEFAULT_TYPE, PaymentRequestDto.class.getName());
-
+        // 파라미터로 넘어온 DTO 클래스 이름으로 역직렬화 타겟 강제 지정
+        config.put(JacksonJsonDeserializer.VALUE_DEFAULT_TYPE, targetType.getName());
         return new DefaultKafkaConsumerFactory<>(config);
     }
 
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, PaymentRequestDto> paymentKafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, PaymentRequestDto> factory = new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(paymentConsumerFactory());
+    private <T> ConcurrentKafkaListenerContainerFactory<String, T> createContainerFactory(Class<T> targetType) {
 
-        // 실무 팁: 파티션 수에 맞춰 쓰레드를 늘리면 동시 처리량이 늘어납니다.
-        // factory.setConcurrency(3);
-        // 예외 처리
-        // factory.setCommonErrorHandler(paymentErrorHandler());
-
-        // 커밋의 제어건을 SpringBoot에 넘김
+        ConcurrentKafkaListenerContainerFactory<String, T> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        // 실제 Kafka Consumer 인스턴스를 생성하는 대상 지정
+        factory.setConsumerFactory(createConsumerFactory(targetType));
+        // 수동 커밋 설정
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
 
+        // factory.setConcurrency(3); // 필요시 활성화
         return factory;
     }
 
+    // =========================================================
+    // ✅ 2. 실제 Bean 등록 (도메인 추가 시 여기서 딱 한 줄만 추가하면 끝!)
+    // =========================================================
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentRequestDto> paymentFactory() {
+        return createContainerFactory(PaymentRequestDto.class);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, OrderRequestDto> orderFactory() {
+        return createContainerFactory(OrderRequestDto.class);
+    }
 }
 ```
 
-### Consumer Processor
+### Consumer Listener
 > 주의 사항 : @KafkaListener 의 역할과 Service 역할이 다르기에 Class 분리 필요  
 > Interface Impl 구조가 아님 비즈니스 로직이 필요하면 DI를 통해 구현
 ```java
