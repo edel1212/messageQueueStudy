@@ -119,13 +119,13 @@ docker exec -it kafka-kraft kafka-console-consumer --bootstrap-server localhost:
 ### 테스트 시나리오 및 결과
 
 #### Case 1: Key를 지정하지 않고 전송 (Key == Null)
-* **방식:** 프로듀서에서 100개의 메시지를 Key 없이 빠른 속도로 연속 전송.
+* **방식:** 100개의 메시지를 Key 없이 전송.
 * **라우팅 전략:** `Sticky Partitioning` (카프카 2.4 이후 기본값 적용)
 * **결과 (테스트 검증):**
-  * 예상과 달리 100개의 메시지가 파티션 0, 1, 2에 1개씩 균등하게 라운드 로빈(Round-Robin) 방식으로 분배되지 **않음**.
-  * 특정 파티션(예: 파티션 1)에 메시지가 뭉텅이로 몰려서 전송되는 현상을 확인함.
-  * **(원인 분석)**: 이는 프로듀서가 네트워크 전송 효율을 높이기 위해, 메시지를 하나의 배치(Batch)로 묶어 특정 파티션에 우선적으로 몰아넣는 **Sticky Partitioner**가 작동했기 때문임.
-  * **(🚨 한계점)** 전체적인 처리량(Throughput)은 좋으나, 동일한 사용자(또는 동일한 주문)에 대한 이벤트가 여러 파티션으로 흩어질 가능성이 여전히 존재하므로 **비즈니스 로직의 순서가 역전될 위험**이 있음.
+  * 예상과 달리 100개의 메시지가 파티션 `0, 1, 2`에 1개씩 **균등하게 라운드 로빈(Round-Robin) 방식으로 분배되지 않음**.
+  * 특정 파티션에 메시지가 **몰려서 전송되는 현상을 확인**함.
+  * **(원인 분석)**: 이는 프로듀서가 네트워크 전송 효율을 높이기 위해, 메시지를 하나의 배치(Batch)로 묶어 특정 파티션에 우선적으로 몰아넣는 **Sticky Partitioner**가 작동했기 때문.
+  * **(🚨 한계점)** 전체적인 처리량(Throughput)은 좋으나, 동일한 사용자(또는 동일한 주문)에 대한 이벤트가 **여러 파티션으로 흩어질 가능성이 존재**하므로 **비즈니스 로직의 순서가 역전될 위험**이 있음.
 
 #### Case 2: 특정 Key를 지정하여 전송 (Key == "order-123")
 * **방식:** 주문 ID(`orderId`)와 같은 식별자를 Key로 지정하여 100개의 연관 메시지 전송.
@@ -139,6 +139,30 @@ docker exec -it kafka-kraft kafka-console-consumer --bootstrap-server localhost:
 - 순서 보장 🙆 : 이벤트의 기준이 되는 고유 식별자(예: `orderId` 또는 `userId`)를 **Kafka Message Key로 지정**
   - **"사용자 A의 주문 ➡️ 결제 승인 ➡️ 배송 시작 ➡️ 취소"** 이벤트는 반드시 발생한 순서대로 적용이 필요한 경우
 - 순서 필요 ❌ : 단순 푸시 알림 발송이나 단순 로그 수집과 같이 순서가 중요하지 않은 대용량 트래픽의 경우, Key 없이 발행하여 파티션 전체를 활용한 병렬 분산 처리 효율을 극대화
+
+## 🚀 Consumer Group Scale-out 및 Rebalancing 분석
+
+### 테스트 환경
+* **Topic:** `order.request`
+* **Partitions:** 3개
+* **Producer-Server:** Spring Boot (KafkaTemplate)
+* **Consumer-Server1:** Spring Boot (@KafkaListener)
+* **Consumer-Server2:** Spring Boot (@KafkaListener)
+
+### 테스트 시나리오 및 결과
+
+#### Case 1: 인스턴스 추가 (Scale-out) 시 파티션 할당
+* **방식:** 서버 A(8080) 단독 구동 중 서버 B(8081) 추가 투입.
+* **결과:**
+  * 서버 A가 독점하던 파티션 [0, 1, 2] 중 일부가 서버 B로 이동. 
+    * Result : 서버 A(파티션 2) / 서버 B(파티션 0, 1) 로 분산 처리 확인.
+
+#### Case 2: 리밸런싱 지연 발생 (Stop-the-World)
+* **현상:** `서버 B 추가` 또는 `서버 A 종료` 시 약 `30~60초`간 메시지를 받지 못하는 현상 발생.
+* **원인 분석:**
+  * Session Timeout: 브로커가 기존 컨슈머의 '죽음'이나 '상태 변화'를 인지하기까지 기다리는 대기 시간(session.timeout.ms) 발생.
+  * Eager Rebalancing: 모든 컨슈머가 현재 소유한 파티션을 반납하고 다시 할당받는 과정에서 전체 처리가 멈추는 'Stop-the-World' 단계 확인.
+
 
 
 ## Zookeeper 사용 버전
