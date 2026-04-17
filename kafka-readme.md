@@ -163,12 +163,15 @@ docker exec -it kafka-kraft kafka-console-consumer --bootstrap-server localhost:
   * Session Timeout: 브로커가 기존 컨슈머의 '죽음'이나 '상태 변화'를 인지하기까지 기다리는 대기 시간(session.timeout.ms) 발생.
   * Eager Rebalancing: 모든 컨슈머가 현재 소유한 파티션을 반납하고 다시 할당받는 과정에서 전체 처리가 멈추는 'Stop-the-World' 단계 확인.
 
-## 🚀 메세지 받는 방식 성능 최적화 ( 단건 씩 / 묶음[kafka가 내부 반복으로 단건으로 던져 줌] / List형태로 받기 )
-> 메세지를 받는 방식은 원하는 로직에 맞게 선택하는 것이 중요하다
+## 🚀 메시지 소비(Consumption) 방식 및 성능 최적화
+> 비즈니스 요구사항과 트래픽 규모에 맞는 최적의 리스너 모드 선택이 중요
 
-### 단건 씩
-- `ConsumerConfig.MAX_POLL_RECORDS_CONFIG : "1"` 설정을 통해 한번에 최대로 받을 수 있는 메세지 묶음의 개수를 1개로 지정하면 된다. 
-- `ConsumerConfig.MAX_POLL_RECORDS_CONFIG` 미설정 시 **기본값**은 `500` 이다.    
+### 1. 단건 강제 처리 (Single Record Fetch)
+- **설정:** `ConsumerConfig.MAX_POLL_RECORDS_CONFIG : "1"`
+- **동작:** 네트워크 통신 한 번에 **무조건 1개의 메시지만 가져옴**
+- **특징:** - 메시지 한 건당 [네트워크 요청 -> 처리 -> 커밋]의 사이클이 반복
+    - **네트워크 Latency가 극심하게 발생**하므로 **실무 대용량 처리에는 부적함**
+    - 매우 엄격한 순차 처리가 필요하거나, **한 건의 처리 시간이 너무 길어 타임아웃이 우려될 때 제한적으로 사용**
 ```java
 @EnableKafka
 @Configuration
@@ -184,13 +187,50 @@ public class KafkaConsumerConfig {
 }
 ```
 
-### 묶음[kafka가 내부 반복으로 단건으로 던져 줌]
-- 아무런 설정을 하지 않을 시 기본 값
-  - Kafka는 원래 부터 대량의 메세지 전송이기에 효율을 위헤 데이터를 묶어서 전달하여 내부 Kafka 로직안에서 반복을 돌며 단건으로 던져주기에 묶음으로 받지만 단건으로 받는 것 처럼 보였던 것이다.
+### 레코드 단위 처리 (Record Listener - Default)
+- **설정:** 별도 설정 없음 (기본값 `max.poll.records = 500`)
+- **동작:** **기본으로 뭉텅이(Batch)로 가져오지만**, Spring Kafka 컨테이너가 내부적으로 **반복문을 돌려** `@KafkaListener` 메서드를 **메시지 개수만큼 호출**하여 사용
+  - 코드 내 Consumer 로직에서는 단건 DTO를 처리하는 로직 사용
+- **특징:**
+    - 단건마다 DB Connection을 맺거나 비즈니스 로직을 수행하므로 **DB I/O 병목**이 발생할 수 있음
 
-### List형태로 받기
+### 리스트 단위 처리 (Batch Listener)
+- **Config 설정:** `factory.setBatchListener(true)` 
+  - `ConcurrentKafkaListenerContainerFactory` 내 제네릭은 `<String, DTO>`형식으로 지정해도 👌 `<String, List<DTO>>` 필요 ❌
+- **Consumer 설정:** 메서드 파라미터를 `List<DTO>` 수신 설정
+- **동작:** 네트워크로 가져온 뭉텅이 데이터를 **리스트 그대로 메서드에 전달**
+- **특징:**
+    - **성능 극대화:** JPA `saveAll()`이나 JDBC `Bulk Insert`를 통해 **DB 통신 횟수를 획기적으로 줄일 수 있음**
+    - **커밋 효율:** 리스트 전체 처리 후 단 한 번의 `ack.acknowledge()`로 배치 **전체 오프셋을 커밋 처리** 함
+    - **주의:** 리스트 내 일부 메시지 처리 실패 시 전체 재시도 로직이 복잡해질 수 있으므로 에러 핸들링(예: `BatchErrorHandler`)에 유의 필요  
 
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class InventorConsumer {
+    @Value("${server.port}")
+    private String serverPort;
 
+    @KafkaListener(
+            // 프로듀서의 TOPIC 상수와 동일한 이름
+            topics = "inventory.request",
+            // 그룹명
+            groupId = "inventory-processor-group",
+            // KafkaConsumerConfig에 설정된 Container Factory 명
+            containerFactory = "inventoryFactory"
+    )
+    public void consumeOrder(List<InventoryDto> dtos
+                            , Acknowledgment ack
+    ) {
+        // 👍 TODO 여기서 List를 벌크 Insert 혹은 Update를 하면 한건씩 CUD 하는것 보다 훨씬 효율적으로 처리가 가능함
+        
+        // 💡 배치 모드에서는  한 번의 ack 호출로 수백 개의 메시지 오프셋이 한 번에 커밋가능
+        ack.acknowledge();
+    }
+
+}
+```
 
 
 ## Zookeeper 사용 버전
