@@ -2,8 +2,9 @@
 > Topic 생성의 경우 CLI를 통해 생성하는것이 좋다.
 
 ## 기본 Produce Server <->  Consumer Server
+> Produce / Consumer Server 를 나눠서 구축하여 진행  
 
-### Producer Config
+### Produce Server Config
 ```java
 @Configuration
 public class KafkaProducerConfig {
@@ -80,9 +81,7 @@ public class PaymentProducerServiceImpl implements PaymentProducerService {
 }
 ```
 
-## Consumer Server
-
-### Consumer Config
+### Consumer Server Config
 > 공통 설정 분리와 "createContainerFactory(공장)" 과 "createContainerFactory(일꾼)" 을 분리하여 불필요한 공통 코드 제거하여 설정
 ```java
 @EnableKafka
@@ -180,3 +179,130 @@ public class PaymentConsumer {
     }
 }
 ```
+
+## 컨슈머 장애 처리 - DLQ (Dead Letter Queue) 설정
+
+### Consumer Server Error Config
+- `KafkaErrorConfig`를 만들어주는 이유는 소모만 하는것이 아닌 `*.DLQ` 토픽에 **직접 메세지를 Producer 해야하기 때문**임
+- DefaultErrorHandler를 통해 에러가 발생했을 경우 어떠한 방식으로 처리할지 지정할 수 있다.
+```java
+@Slf4j
+@Configuration
+public class KafkaErrorConfig {
+
+    @Value("${spring.kafka.bootstrap-servers}")
+    private String bootstrapServers;
+
+    private Map<String, Object> baseConfig() {
+
+        Map<String, Object> config = new HashMap<>();
+
+        // 필수 설정
+        // Kafka Server (브로커) 등록
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        // 💡 프로듀서는 데이터를 '보낼 때' 바이트로 변환해야 하므로 Serializer를 사용합니다.
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JacksonJsonSerializer.class);
+
+        // 신뢰성 설정
+        config.put(ProducerConfig.ACKS_CONFIG, "all");              // 모든 replica 확인 후 ack
+        config.put(ProducerConfig.RETRIES_CONFIG, 3);               // 실패 시 재시도 횟수 (브로커 서버 및 토픽 문제가 아닐 경우)
+        config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true); // 중복 전송 방지
+
+        // 성능 설정
+        config.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);        // 배치 사이즈 (16KB)
+        config.put(ProducerConfig.LINGER_MS_CONFIG, 1);             // 배치 대기 시간 (ms)
+        config.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 33554432);  // 버퍼 메모리 (32MB)
+
+        // 토픽이 존재하지 않을 경우 재시도 시간
+        config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 10_000);
+
+        return config;
+    }
+
+    // ✅ 1. 모든 DTO를 수용할 수 있는 단 하나의 공통 KafkaTemplate
+    @Bean
+    public KafkaTemplate<String, Object> commonKafkaTemplate() {
+        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(baseConfig()));
+    }
+
+    // ✅ 2. 단 하나의 공통 ErrorHandler
+    @Bean
+    public DefaultErrorHandler commonErrorHandler(KafkaTemplate<String, Object> commonKafkaTemplate) {
+
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
+                commonKafkaTemplate,
+                (record, exception) -> {
+                    // 💡 핵심: 하드코딩된 상수 대신, 실패한 원본 토픽명 뒤에 ".DLQ"를 붙여 동적 라우팅
+                    String dlqTopic = record.topic() + ".DLQ";
+
+                    log.error("[{}] DLQ 전송 - offset: {}, cause: {}",
+                            dlqTopic, record.offset(), exception.getMessage());
+
+                    return new TopicPartition(dlqTopic, -1);
+                }
+        );
+
+        FixedBackOff backOff = new FixedBackOff(1_000L, 3L);
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, backOff);
+
+        errorHandler.addNotRetryableExceptions(
+                JsonParseException.class,
+                IllegalArgumentException.class
+        );
+
+        errorHandler.setRetryListeners((record, ex, deliveryAttempt) ->
+                log.warn("재시도 중 - 시도 횟수: {}/{}, topic: {}, offset: {}, cause: {}",
+                        deliveryAttempt, 3, record.topic(), record.offset(), ex.getMessage())
+        );
+
+        return errorHandler;
+    }
+
+}
+```
+
+### Consumer Config
+- Factory 와 Container 내 상위에 작성했던 `DefaultErrorHandler commonErrorHandler`를 인자로 받아 설정
+```java
+@EnableKafka
+@Configuration
+public class KafkaConsumerConfig {
+    @Value("${spring.kafka.bootstrap-servers}")
+    private String bootstrapServers;
+
+    // 공통 설정
+    private Map<String, Object> commonConfig() {
+        Map<String, Object> config = new HashMap<>();
+        // code...
+        return config;
+    }
+
+    private <T> ConsumerFactory<String, T> createConsumerFactory(Class<T> targetType) {
+        Map<String, Object> config = commonConfig();
+        /// code...
+        return new DefaultKafkaConsumerFactory<>(config);
+    }
+
+    private <T> ConcurrentKafkaListenerContainerFactory<String, T> createContainerFactory(
+            Class<T> targetType, DefaultErrorHandler errorHandler) {
+
+        ConcurrentKafkaListenerContainerFactory<String, T> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(createConsumerFactory(targetType));
+        factory.setCommonErrorHandler(errorHandler);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+
+        return factory;
+    }
+
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, OrderRequestDto> orderFactory(
+            DefaultErrorHandler commonErrorHandler) {
+        // OrderRequestDto 클래스와 에러 핸들러만 넘겨서 공장 가동!
+        return createContainerFactory(OrderRequestDto.class, commonErrorHandler);
+    }
+
+}
+```
+
