@@ -163,6 +163,34 @@ docker exec -it kafka-kraft kafka-console-consumer --bootstrap-server localhost:
   * Session Timeout: 브로커가 기존 컨슈머의 '죽음'이나 '상태 변화'를 인지하기까지 기다리는 대기 시간(session.timeout.ms) 발생.
   * Eager Rebalancing: 모든 컨슈머가 현재 소유한 파티션을 반납하고 다시 할당받는 과정에서 전체 처리가 멈추는 'Stop-the-World' 단계 확인.
 
+## 🚀 메세지 받는 방식 성능 최적화 ( 단건 씩 / 묶음[kafka가 내부 반복으로 단건으로 던져 줌] / List형태로 받기 )
+> 메세지를 받는 방식은 원하는 로직에 맞게 선택하는 것이 중요하다
+
+### 단건 씩
+- `ConsumerConfig.MAX_POLL_RECORDS_CONFIG : "1"` 설정을 통해 한번에 최대로 받을 수 있는 메세지 묶음의 개수를 1개로 지정하면 된다. 
+- `ConsumerConfig.MAX_POLL_RECORDS_CONFIG` 미설정 시 **기본값**은 `500` 이다.    
+```java
+@EnableKafka
+@Configuration
+public class KafkaConsumerConfig {
+    // 공통 설정
+    private Map<String, Object> commonConfig() {
+        Map<String, Object> config = new HashMap<>();
+        // 💡 브로커에게 메세지를 받을 때 "무조건 1개씩만 받을 수 있게" 강제합니다.
+        // -> 기본 값 500
+        config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1");
+        return config;
+    }
+}
+```
+
+### 묶음[kafka가 내부 반복으로 단건으로 던져 줌]
+- 아무런 설정을 하지 않을 시 기본 값
+  - Kafka는 원래 부터 대량의 메세지 전송이기에 효율을 위헤 데이터를 묶어서 전달하여 내부 Kafka 로직안에서 반복을 돌며 단건으로 던져주기에 묶음으로 받지만 단건으로 받는 것 처럼 보였던 것이다.
+
+### List형태로 받기
+
+
 
 
 ## Zookeeper 사용 버전
