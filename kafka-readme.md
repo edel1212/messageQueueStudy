@@ -22,7 +22,7 @@
   - 하나의 파티션은 동일 그룹 내에서 오직 한 개의 Consumer만 접근 가능하여 중복 처리를 방지함
   - ✅ 하나의 메세지를 다양하게 처리하기 위해서는 그만큼의 `Consumer Group`을 만들어줘야 함
 
-## 상용 환경고
+## 상용 환경 (Production) 고려사항
 > 최소 3대 이상의 서버(브로커)에서 분산 운영해야 함
 - 하나의 클러스터에서 100개 이상의 브로커 운영이 가능함.
   - 넷플릭스에서는 36개 이상의 카프카 클러스터를 운영하고 구성하는 브로커는 4,000개가 넘는다.
@@ -232,6 +232,14 @@ public class InventorConsumer {
 }
 ```
 
+## 🚨 컨슈머 장애 처리 및 DLQ (Dead Letter Queue) 전략
+- **문제 상황:** 특정 메시지의 데이터 포맷이 잘못되었거나, 일시적인 외부 API 통신 장애로 인해 컨슈머 리스너에서 **계속 예외(Exception)가 발생**하는 경우
+- **해결책 (Error Handling & DLQ):**
+  - **최대 재시도 횟수(예: 3회) 및 백오프(BackOff) 간격(예: 1초)** 을 설정
+  - 재시도를 모두 실패한 메시지는 원본 메세지의 복사본을 DLQ 전용 토픽(예: `payment.request.DLQ`)으로 발행(Produce)하여 격리함
+    - DLQ 발행이 성공하면 메인 토픽의 해당 메세지 오프셋을 커밋(Commit)하여 다음 메세지 처리를 이어갈 수 있도록(`Skip`) 조치 필요 
+  - 관리자가 DLQ 토픽의 메시지만 따로 꺼내서 **수동 복구(Replay) 처리 진행**
+- [설정 방법](https://github.com/edel1212/messageQueueStudy/blob/main/kafka-with-spring-boot-readme.md#%EC%BB%A8%EC%8A%88%EB%A8%B8-%EC%9E%A5%EC%95%A0-%EC%B2%98%EB%A6%AC---dlq-dead-letter-queue-%EC%84%A4%EC%A0%95)
 
 ## Zookeeper 사용 버전
 ### 단일 노드 방식 예시 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/easy-version)
