@@ -1,0 +1,113 @@
+services:
+  # =========================================================
+  # 🟢 브로커 1번 (kafka-1)
+  # =========================================================
+  kafka-1:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-1
+    ports:
+      - "9092:9092" # 외부(Spring)에서 접속할 포트
+    networks:
+      - kafka-cluster-net
+    environment:
+      # [1] KRaft 모드 핵심 설정 - Node ID 지정
+      KAFKA_NODE_ID: 1
+      # 해당 서버가 가지는 Roles
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      # 💡 [클러스터 핵심] 1, 2, 3번 노드 모두가 투표권을 가지고 컨트롤러 쿼럼을 형성
+      # > [Node_ID]@[Hostname]:[Port] 형식
+      # 세 대 중 한 대가 죽어도 나머지 두 대가 다수결로 클러스터를 유지
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093"
+
+      # [2] 네트워크 / 통신 설정
+      # 💡 [클러스터 핵심] 통신망을 3개로 분리합니다.
+      # INTERNAL: 카프카 브로커들끼리 데이터를 복제할 때 쓰는 **내부 통신망**
+      # EXTERNAL: Spring Boot 서버가 접속할 **외부 통신망**
+      # CONTROLLER: **클러스터 상태 관리**를 위한 통신망
+      KAFKA_LISTENERS: "INTERNAL://kafka-1:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093"
+      # 남에게 알려줄 주소를 작성
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka-1:29092,EXTERNAL://localhost:9092"
+      # 복제용 채널 리스너 지정 - 브로커들끼리 데이터를 주고받을(복제할) 때 어떤 리스너 지정
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      # 컨트롤러용 채널 - KRaft 컨트롤러들이 서로 상태를 공유할 때 사용할 리스너 이름을 지정
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      # 리스너 이름(사용자가 정의한 이름)과 실제 카프카가 이해하는 보안 프로토콜을 연결하는 지도입니다.
+      # > "내가 INTERNAL이라고 부르는 리스너는 사실 PLAINTEXT(암호화 없음) 규약을 따를 거야"라고 정의하는 것입니다.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+
+      # 존재하지 않는 토픽으로 메시지를 보낼 때, 브로커가 알아서 토픽을 만들지 여부를 결정
+      # > false 일 경우 자동 생성 ❌
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+
+      # [3] 저장소 및 클러스터 식별 설정
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+      # 💡 [클러스터 핵심] 3대의 브로커가 모두 "같은 클러스터 ID"를 가져야 하나의 팀으로 묶입니다.
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+
+      # 💡 [클러스터 핵심] 이제 브로커가 3대이므로, 삽질하셨던 1 값을 정석인 3으로 돌려놓습니다.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2 # 최소 2대 이상 동기화되어야 정상으로 판단
+
+  # =========================================================
+  # 🟢 브로커 2번 (kafka-2)
+  # =========================================================
+  kafka-2:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-2
+    ports:
+      - "9093:9093" # 포트 충돌을 막기 위해 9093 사용
+    networks:
+      - kafka-cluster-net
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093"
+
+      # 자신의 호스트명(kafka-2)과 포트(9093)에 맞게 리스너 수정
+      KAFKA_LISTENERS: "INTERNAL://kafka-2:29092,EXTERNAL://0.0.0.0:9093,CONTROLLER://0.0.0.0:29093"
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka-2:29092,EXTERNAL://localhost:9093"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk" # 1번 브로커와 동일한 ID
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+  # =========================================================
+  # 🟢 브로커 3번 (kafka-3)
+  # =========================================================
+  kafka-3:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-3
+    ports:
+      - "9094:9094" # 포트 충돌을 막기 위해 9094 사용
+    networks:
+      - kafka-cluster-net
+    environment:
+      KAFKA_NODE_ID: 3
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093"
+
+      # 자신의 호스트명(kafka-3)과 포트(9094)에 맞게 리스너 수정
+      KAFKA_LISTENERS: "INTERNAL://kafka-3:29092,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:29093"
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka-3:29092,EXTERNAL://localhost:9094"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk" # 1, 2번 브로커와 동일한 ID
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+# 도커 컨테이너들이 서로 통신할 수 있도록 가상 네트워크 생성
+networks:
+  kafka-cluster-net:
+    driver: bridge
