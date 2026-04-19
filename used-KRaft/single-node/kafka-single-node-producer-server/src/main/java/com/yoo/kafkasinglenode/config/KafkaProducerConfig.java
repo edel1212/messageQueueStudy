@@ -1,5 +1,6 @@
 package com.yoo.kafkasinglenode.config;
 
+import com.yoo.kafkasinglenode.api.inventory.dto.InventoryDto;
 import com.yoo.kafkasinglenode.api.order.dto.OrderCreatedDto;
 import com.yoo.kafkasinglenode.api.payment.dto.PaymentRequestDto;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -54,6 +55,11 @@ public class KafkaProducerConfig {
 
     @Bean
     public KafkaTemplate<String, OrderCreatedDto> orderKafkaTemplate() {
+        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(baseConfig()));
+    }
+
+    @Bean
+    public KafkaTemplate<String, InventoryDto> inventoryKafkaTemplate() {
         return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(baseConfig()));
     }
 

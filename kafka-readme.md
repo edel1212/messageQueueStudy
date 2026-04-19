@@ -22,7 +22,7 @@
   - 하나의 파티션은 동일 그룹 내에서 오직 한 개의 Consumer만 접근 가능하여 중복 처리를 방지함
   - ✅ 하나의 메세지를 다양하게 처리하기 위해서는 그만큼의 `Consumer Group`을 만들어줘야 함
 
-## 상용 환경고
+## 상용 환경 (Production) 고려사항
 > 최소 3대 이상의 서버(브로커)에서 분산 운영해야 함
 - 하나의 클러스터에서 100개 이상의 브로커 운영이 가능함.
   - 넷플릭스에서는 36개 이상의 카프카 클러스터를 운영하고 구성하는 브로커는 4,000개가 넘는다.
@@ -119,13 +119,13 @@ docker exec -it kafka-kraft kafka-console-consumer --bootstrap-server localhost:
 ### 테스트 시나리오 및 결과
 
 #### Case 1: Key를 지정하지 않고 전송 (Key == Null)
-* **방식:** 프로듀서에서 100개의 메시지를 Key 없이 빠른 속도로 연속 전송.
+* **방식:** 100개의 메시지를 Key 없이 전송.
 * **라우팅 전략:** `Sticky Partitioning` (카프카 2.4 이후 기본값 적용)
 * **결과 (테스트 검증):**
-  * 예상과 달리 100개의 메시지가 파티션 0, 1, 2에 1개씩 균등하게 라운드 로빈(Round-Robin) 방식으로 분배되지 **않음**.
-  * 특정 파티션(예: 파티션 1)에 메시지가 뭉텅이로 몰려서 전송되는 현상을 확인함.
-  * **(원인 분석)**: 이는 프로듀서가 네트워크 전송 효율을 높이기 위해, 메시지를 하나의 배치(Batch)로 묶어 특정 파티션에 우선적으로 몰아넣는 **Sticky Partitioner**가 작동했기 때문임.
-  * **(🚨 한계점)** 전체적인 처리량(Throughput)은 좋으나, 동일한 사용자(또는 동일한 주문)에 대한 이벤트가 여러 파티션으로 흩어질 가능성이 여전히 존재하므로 **비즈니스 로직의 순서가 역전될 위험**이 있음.
+  * 예상과 달리 100개의 메시지가 파티션 `0, 1, 2`에 1개씩 **균등하게 라운드 로빈(Round-Robin) 방식으로 분배되지 않음**.
+  * 특정 파티션에 메시지가 **몰려서 전송되는 현상을 확인**함.
+  * **(원인 분석)**: 이는 프로듀서가 네트워크 전송 효율을 높이기 위해, 메시지를 하나의 배치(Batch)로 묶어 특정 파티션에 우선적으로 몰아넣는 **Sticky Partitioner**가 작동했기 때문.
+  * **(🚨 한계점)** 전체적인 처리량(Throughput)은 좋으나, 동일한 사용자(또는 동일한 주문)에 대한 이벤트가 **여러 파티션으로 흩어질 가능성이 존재**하므로 **비즈니스 로직의 순서가 역전될 위험**이 있음.
 
 #### Case 2: 특정 Key를 지정하여 전송 (Key == "order-123")
 * **방식:** 주문 ID(`orderId`)와 같은 식별자를 Key로 지정하여 100개의 연관 메시지 전송.
@@ -140,6 +140,106 @@ docker exec -it kafka-kraft kafka-console-consumer --bootstrap-server localhost:
   - **"사용자 A의 주문 ➡️ 결제 승인 ➡️ 배송 시작 ➡️ 취소"** 이벤트는 반드시 발생한 순서대로 적용이 필요한 경우
 - 순서 필요 ❌ : 단순 푸시 알림 발송이나 단순 로그 수집과 같이 순서가 중요하지 않은 대용량 트래픽의 경우, Key 없이 발행하여 파티션 전체를 활용한 병렬 분산 처리 효율을 극대화
 
+## 🚀 Consumer Group Scale-out 및 Rebalancing 분석
+
+### 테스트 환경
+* **Topic:** `order.request`
+* **Partitions:** 3개
+* **Producer-Server:** Spring Boot (KafkaTemplate)
+* **Consumer-Server1:** Spring Boot (@KafkaListener)
+* **Consumer-Server2:** Spring Boot (@KafkaListener)
+
+### 테스트 시나리오 및 결과
+
+#### Case 1: 인스턴스 추가 (Scale-out) 시 파티션 할당
+* **방식:** 서버 A(8080) 단독 구동 중 서버 B(8081) 추가 투입.
+* **결과:**
+  * 서버 A가 독점하던 파티션 [0, 1, 2] 중 일부가 서버 B로 이동. 
+    * Result : 서버 A(파티션 2) / 서버 B(파티션 0, 1) 로 분산 처리 확인.
+
+#### Case 2: 리밸런싱 지연 발생 (Stop-the-World)
+* **현상:** `서버 B 추가` 또는 `서버 A 종료` 시 약 `30~60초`간 메시지를 받지 못하는 현상 발생.
+* **원인 분석:**
+  * Session Timeout: 브로커가 기존 컨슈머의 '죽음'이나 '상태 변화'를 인지하기까지 기다리는 대기 시간(session.timeout.ms) 발생.
+  * Eager Rebalancing: 모든 컨슈머가 현재 소유한 파티션을 반납하고 다시 할당받는 과정에서 전체 처리가 멈추는 'Stop-the-World' 단계 확인.
+
+## 🚀 메시지 소비(Consumption) 방식 및 성능 최적화
+> 비즈니스 요구사항과 트래픽 규모에 맞는 최적의 리스너 모드 선택이 중요
+
+### 1. 단건 강제 처리 (Single Record Fetch)
+- **설정:** `ConsumerConfig.MAX_POLL_RECORDS_CONFIG : "1"`
+- **동작:** 네트워크 통신 한 번에 **무조건 1개의 메시지만 가져옴**
+- **특징:** - 메시지 한 건당 [네트워크 요청 -> 처리 -> 커밋]의 사이클이 반복
+    - **네트워크 Latency가 극심하게 발생**하므로 **실무 대용량 처리에는 부적함**
+    - 매우 엄격한 순차 처리가 필요하거나, **한 건의 처리 시간이 너무 길어 타임아웃이 우려될 때 제한적으로 사용**
+```java
+@EnableKafka
+@Configuration
+public class KafkaConsumerConfig {
+    // 공통 설정
+    private Map<String, Object> commonConfig() {
+        Map<String, Object> config = new HashMap<>();
+        // 💡 브로커에게 메세지를 받을 때 "무조건 1개씩만 받을 수 있게" 강제합니다.
+        // -> 기본 값 500
+        config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1");
+        return config;
+    }
+}
+```
+
+### 레코드 단위 처리 (Record Listener - Default)
+- **설정:** 별도 설정 없음 (기본값 `max.poll.records = 500`)
+- **동작:** **기본으로 뭉텅이(Batch)로 가져오지만**, Spring Kafka 컨테이너가 내부적으로 **반복문을 돌려** `@KafkaListener` 메서드를 **메시지 개수만큼 호출**하여 사용
+  - 코드 내 Consumer 로직에서는 단건 DTO를 처리하는 로직 사용
+- **특징:**
+    - 단건마다 DB Connection을 맺거나 비즈니스 로직을 수행하므로 **DB I/O 병목**이 발생할 수 있음
+
+### 리스트 단위 처리 (Batch Listener)
+- **Config 설정:** `factory.setBatchListener(true)` 
+  - `ConcurrentKafkaListenerContainerFactory` 내 제네릭은 `<String, DTO>`형식으로 지정해도 👌 `<String, List<DTO>>` 필요 ❌
+- **Consumer 설정:** 메서드 파라미터를 `List<DTO>` 수신 설정
+- **동작:** 네트워크로 가져온 뭉텅이 데이터를 **리스트 그대로 메서드에 전달**
+- **특징:**
+    - **성능 극대화:** JPA `saveAll()`이나 JDBC `Bulk Insert`를 통해 **DB 통신 횟수를 획기적으로 줄일 수 있음**
+    - **커밋 효율:** 리스트 전체 처리 후 단 한 번의 `ack.acknowledge()`로 배치 **전체 오프셋을 커밋 처리** 함
+    - **주의:** 리스트 내 일부 메시지 처리 실패 시 전체 재시도 로직이 복잡해질 수 있으므로 에러 핸들링(예: `BatchErrorHandler`)에 유의 필요  
+
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class InventorConsumer {
+    @Value("${server.port}")
+    private String serverPort;
+
+    @KafkaListener(
+            // 프로듀서의 TOPIC 상수와 동일한 이름
+            topics = "inventory.request",
+            // 그룹명
+            groupId = "inventory-processor-group",
+            // KafkaConsumerConfig에 설정된 Container Factory 명
+            containerFactory = "inventoryFactory"
+    )
+    public void consumeOrder(List<InventoryDto> dtos
+                            , Acknowledgment ack
+    ) {
+        // 👍 TODO 여기서 List를 벌크 Insert 혹은 Update를 하면 한건씩 CUD 하는것 보다 훨씬 효율적으로 처리가 가능함
+        
+        // 💡 배치 모드에서는  한 번의 ack 호출로 수백 개의 메시지 오프셋이 한 번에 커밋가능
+        ack.acknowledge();
+    }
+
+}
+```
+
+## 🚨 컨슈머 장애 처리 및 DLQ (Dead Letter Queue) 전략
+- **문제 상황:** 특정 메시지의 데이터 포맷이 잘못되었거나, 일시적인 외부 API 통신 장애로 인해 컨슈머 리스너에서 **계속 예외(Exception)가 발생**하는 경우
+- **해결책 (Error Handling & DLQ):**
+  - **최대 재시도 횟수(예: 3회) 및 백오프(BackOff) 간격(예: 1초)** 을 설정
+  - 재시도를 모두 실패한 메시지는 원본 메세지의 복사본을 DLQ 전용 토픽(예: `payment.request.DLQ`)으로 발행(Produce)하여 격리함
+    - DLQ 발행이 성공하면 메인 토픽의 해당 메세지 오프셋을 커밋(Commit)하여 다음 메세지 처리를 이어갈 수 있도록(`Skip`) 조치 필요 
+  - 관리자가 DLQ 토픽의 메시지만 따로 꺼내서 **수동 복구(Replay) 처리 진행**
+- [설정 방법](https://github.com/edel1212/messageQueueStudy/blob/main/kafka-with-spring-boot-readme.md#%EC%BB%A8%EC%8A%88%EB%A8%B8-%EC%9E%A5%EC%95%A0-%EC%B2%98%EB%A6%AC---dlq-dead-letter-queue-%EC%84%A4%EC%A0%95)
 
 ## Zookeeper 사용 버전
 ### 단일 노드 방식 예시 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/easy-version)

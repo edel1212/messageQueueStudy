@@ -1,5 +1,6 @@
 package com.yoo.kafkasinglenodecosumerserver.config;
 
+import com.yoo.kafkasinglenodecosumerserver.api.inventory.dto.InventoryDto;
 import com.yoo.kafkasinglenodecosumerserver.api.order.dto.OrderRequestDto;
 import com.yoo.kafkasinglenodecosumerserver.api.payment.dto.PaymentRequestDto;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -42,6 +43,11 @@ public class KafkaConsumerConfig {
 
         // ✅ Producer 타입 헤더 무시
         config.put(JacksonJsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+
+        // 💡 브로커에게 메세지를 받을 때 "무조건 1개씩만 받을 수 있게" 강제합니다.
+        // -> 기본 값 500
+        // config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1");
+
         return config;
     }
 
@@ -83,5 +89,17 @@ public class KafkaConsumerConfig {
             DefaultErrorHandler commonErrorHandler) {
         // OrderRequestDto 클래스와 에러 핸들러만 넘겨서 공장 가동!
         return createContainerFactory(OrderRequestDto.class, commonErrorHandler);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, InventoryDto> inventoryFactory(
+            DefaultErrorHandler commonErrorHandler) {
+        // InventoryDto 클래스와 에러 핸들러만 넘겨서 공장 가동!
+        ConcurrentKafkaListenerContainerFactory<String, InventoryDto> factory = createContainerFactory(InventoryDto.class, commonErrorHandler);
+
+        // 묶음으로 데이터를 받음
+        factory.setBatchListener(true);
+
+        return factory;
     }
 }

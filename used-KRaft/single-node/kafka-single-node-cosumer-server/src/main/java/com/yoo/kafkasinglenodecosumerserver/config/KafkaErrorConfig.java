@@ -25,10 +25,6 @@ public class KafkaErrorConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
-    // ✅ DLQ 토픽명 상수 관리
-    private static final String PAYMENT_DLQ_TOPIC = "payment.request.DLQ";
-    private static final String ORDER_DLQ_TOPIC = "order.request.DLQ";
-
     private Map<String, Object> baseConfig() {
 
         Map<String, Object> config = new HashMap<>();
