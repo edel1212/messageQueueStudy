@@ -13,10 +13,15 @@ services:
       # [1] KRaft 모드 핵심 설정 - Node ID 지정
       KAFKA_NODE_ID: 1
       # 해당 서버가 가지는 Roles
+      # 브로커 서버가 많을 경우 ROLE을 더 세분화 하여 저장한다.
+      # ex) 3개의 브로커는 "controller"를 갖고 나머지 40대는 "broker"역할만 진행
       KAFKA_PROCESS_ROLES: "broker,controller"
-      # 💡 [클러스터 핵심] 1, 2, 3번 노드 모두가 투표권을 가지고 컨트롤러 쿼럼을 형성
-      # > [Node_ID]@[Hostname]:[Port] 형식
-      # 세 대 중 한 대가 죽어도 나머지 두 대가 다수결로 클러스터를 유지
+      # 💡 [클러스터 핵심] 컨트롤러 쿼럼(Quorum) 구성
+      # 포맷: [Node_ID]@[Hostname]:[Port]
+      #
+      # - 고가용성: 3대의 컨트롤러 중 1대가 장애를 겪어도 과반수(2대) 합의를 통해 클러스터를 정상 유지합니다.
+      # - 등록 조건: process.roles에 'controller' 역할이 부여된 노드만 이 목록에 명시할 수 있습니다.
+      # - 공통 필수값: 투표권이 없는 순수 'broker' 노드 역시 컨트롤러의 위치를 알아야 하므로, 클러스터 내 모든 서버에 동일하게 선언되어야 합니다.
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093"
 
       # [2] 네트워크 / 통신 설정
