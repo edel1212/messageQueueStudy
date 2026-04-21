@@ -38,7 +38,7 @@
 | **CLUSTER_ID** | 환경변수로 설정 | `kafka-storage.sh`로 생성 후 포맷 지정 |
 | **포트 설정** | 한 PC에 띄우므로 `9092, 9093, 9094` 분리 | 서버가 각각 다르므로 모두 `9092` 통일 가능 |
 
-## CLUSTER_ID 생성 및 지정 (물리서버 구축)
+## CLUSTER_ID 생성 및 브로커들 묶음 (물리서버 구축)
 >  클러스터로 묶인 모든 브로커가  "같은 클러스터 ID"를 가져야 하나의 팀으로 묶임
 ```shell
 # 1. CLUSTER_ID 생성 (한 서버에서 딱 한번만)
@@ -48,14 +48,15 @@ kafka-storage.sh random-uuid
 kafka-storage.sh format -t {생성된UUID} -c /path/server.properties
 ```
 
+## Cluster 동작 확인
 
-## 정상 Cluster 동작 확인 (KRaft 쿼럼 상태 확인)
+### 1. 쿼럼(투표) 상태 확인 방법
 > `bootstrap-server` 지정 시 `,`를 통해 여러 서버의 주소를 입력하여, 클러스터의 전반적인 투표권자(Quorum) 상태를 확인 할 수 있음
-### 확인 명령어
+#### CLI 명령어
 ```shell
 kafka-metadata-quorum --bootstrap-server 192.168.0.50:9092,192.168.0.51:9092,192.168.0.52:9092 describe --status
 ```
-### 응답
+#### 응답
 ```text
 ClusterId:              MkU3OEVBNTcwNTJENDM2Qk
 LeaderId:               1
@@ -65,4 +66,75 @@ MaxFollowerLag:         0
 MaxFollowerLagTimeMs:   0
 CurrentVoters:          [1, 2, 3]
 CurrentObservers:       []
+```
+
+### 2. kafka UI 사용
+> Docker compose를 사용하여 진행
+```yaml
+services:
+  kafka-ui:
+  image: provectuslabs/kafka-ui:latest
+  container_name: kafka-ui
+  ports:
+    - "8090:8080" # 호스트 8090 포트를 컨테이너 8080에 매핑
+  networks:
+    - kafka-cluster-net
+  environment:
+    # UI에 표시될 클러스터 이름 (구분용 라벨)
+    KAFKA_CLUSTERS_0_NAME: local-kraft-cluster
+    # 💡 핵심: UI 컨테이너는 Docker 내부망에서 접속하므로 INTERNAL 주소 사용
+    #    (localhost:9092 쓰면 UI 컨테이너가 자기 자신을 찾아서 실패함)
+    KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka-1:29092,kafka-2:29092,kafka-3:29092"
+    # 💡 [UI 설정] 런타임 환경에서 클러스터 설정을 동적으로 수정 허용
+    # - true: UI 화면 내 'Config' 탭에서 브로커 설정이나 토픽 설정을 즉시 변경 가능합니다.
+    # - false(기본값): UI는 읽기 전용(Read-only) 모드에 가까워지며, 설정 변경 기능이 비활성화됩니다.
+    # - 주의: 운영 환경에서는 실수로 설정을 바꾸지 않도록 false로 두는 경우가 많습니다.
+    DYNAMIC_CONFIG_ENABLED: "false"
+    # 인증 관련 설정
+    AUTH_TYPE: "LOGIN"
+    SPRING_SECURITY_USER_NAME: "admin"
+    SPRING_SECURITY_USER_PASSWORD: "123"
+
+  # 💡 depends_on + condition: service_healthy
+  # - 위에서 정의한 healthcheck가 통과해야 Kafka UI 기동
+  # - 이 설정이 없으면 Kafka가 아직 준비 안 됐는데 UI가 먼저 떠서 연결 실패 로그 반복
+  depends_on:
+    kafka-1:
+      condition: service_healthy
+    kafka-2:
+      condition: service_healthy
+    kafka-3:
+      condition: service_healthy
+```
+
+## 🚀 브로커 장애 시 ISR 확인
+- `ISR (In-Sync Replicas)` : Leader와 충분히 동일한 로그를 유지하고 있는 replica(브로커)들의 ID 목록
+  - Leader는 항상 ISR에 포함된다.
+  - Follower는 지연(lag)이 허용 범위(replica.lag.time.max.ms)를 넘으면 ISR에서 제외된다.
+
+### CLI 
+```shell
+# 토픽 상태 확인
+kafka-topics --describe \
+  --topic {{토픽명}} \
+  --bootstrap-server {{브로커1}},{{브로커2}}
+
+# 특정 브로커 중지 (장애 상황 가정)
+docker stop {{브로커}}
+
+# 다시 상태 확인
+kafka-topics --describe \
+  --topic {{토픽명}} \
+  --bootstrap-server {{브로커1}},{{브로커2}}
+```
+
+### 응답 값
+- `Leader` : 현재 **해당 파티션을 담당**하는 브로커 ID
+- `Replicas` : 파티션을 복제하고 있는 전체 브로커 목록
+- `Isr` : 현재 정상적으로 동기화된 replica 목록
+```text
+Topic: order.request    TopicId: y08uwOT3RoK2yoTTWIUT6g PartitionCount: 3       ReplicationFactor: 3    Configs:
+        Topic: order.request    Partition: 0    Leader: 3       Replicas: 2,3,1 Isr: 3,1
+        Topic: order.request    Partition: 1    Leader: 3       Replicas: 3,1,2 Isr: 3,1
+        Topic: order.request    Partition: 2    Leader: 1       Replicas: 1,2,3 Isr: 1,3
 ```
