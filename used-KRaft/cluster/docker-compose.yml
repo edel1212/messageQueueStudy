@@ -54,6 +54,13 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2 # 최소 2대 이상 동기화되어야 정상으로 판단
 
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   # =========================================================
   # 🟢 브로커 2번 (kafka-2)
   # =========================================================
@@ -83,6 +90,13 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
 
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9093", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   # =========================================================
   # 🟢 브로커 3번 (kafka-3)
   # =========================================================
@@ -111,6 +125,45 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9094", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # =========================================================
+  # 🟣 [신규] Kafka UI - 클러스터 상태 시각화 대시보드
+  # =========================================================
+  # - 파티션별 Leader/ISR 변화를 실시간 GUI로 확인 (장애 테스트 학습 필수)
+  # - Consumer Group Lag, 메시지 내용 조회, 토픽 생성/삭제까지 GUI 제공
+  # - 접속: http://localhost:8090
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8090:8080" # 호스트 8090 포트를 컨테이너 8080에 매핑
+    networks:
+      - kafka-cluster-net
+    environment:
+      # UI에 표시될 클러스터 이름 (구분용 라벨)
+      KAFKA_CLUSTERS_0_NAME: local-kraft-cluster
+      # 💡 핵심: UI 컨테이너는 Docker 내부망에서 접속하므로 INTERNAL 주소 사용
+      #    (localhost:9092 쓰면 UI 컨테이너가 자기 자신을 찾아서 실패함)
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka-1:29092,kafka-2:29092,kafka-3:29092"
+      # 인증 없이 사용 (학습용)
+      DYNAMIC_CONFIG_ENABLED: "true"
+    # 💡 depends_on + condition: service_healthy
+    # - 위에서 정의한 healthcheck가 통과해야 Kafka UI 기동
+    # - 이 설정이 없으면 Kafka가 아직 준비 안 됐는데 UI가 먼저 떠서 연결 실패 로그 반복
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
 
 # 도커 컨테이너들이 서로 통신할 수 있도록 가상 네트워크 생성
 networks:
