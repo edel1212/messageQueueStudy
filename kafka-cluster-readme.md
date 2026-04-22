@@ -138,3 +138,35 @@ Topic: order.request    TopicId: y08uwOT3RoK2yoTTWIUT6g PartitionCount: 3       
         Topic: order.request    Partition: 1    Leader: 3       Replicas: 3,1,2 Isr: 3,1
         Topic: order.request    Partition: 2    Leader: 1       Replicas: 1,2,3 Isr: 1,3
 ```
+
+## 🚀 Producer acks 상황별 설정
+> Producer가 브로커(kafka)로부터 "어디까지 응답을 기다릴지" 결정하는 설정 [ 속도와 안전성(데이터 유실 방지)의 트레이드오프 관계 ]
+
+### acks 설정 비교
+| 설정값             | 동작 방식                             | 속도   | 안정성                    | 특징                      |
+| --------------- | --------------------------------- |------|------------------------| ----------------------- |
+| acks=0          | 브로커 응답을 기다리지 않음 (fire-and-forget) | 가장 빠름 | 👎 매우 낮음 (유실 가능)       | 네트워크/브로커 상태 무시하고 전송만 수행 |
+| acks=1          | Leader 브로커만 수신 확인                 | 빠름   | 중간 (Leader 장애 시 유실 가능) | 일반적인 기본 설정              |
+| acks=all (`-1`) | ISR(복제본 전체) 수신 확인                 | 느림   | 👍 매우 높음 (유실 없음에 가까움)  | 데이터 신뢰성 최우선             |
+
+
+### 흐름 비교
+```text
+acks=0   : Producer ─→ Leader                        (응답 대기 ❌)
+
+acks=1   : Producer ─→ Leader ─→ Producer            (Leader 응답만 대기)
+
+acks=all : Producer ─→ Leader ─→ Follower 복제 ─→ Producer (ISR 전체 완료 대기)
+```
+
+### 식당 비유
+> 차이는 손님(Producer)의 "기다리는 태도"뿐, 주방(Broker)은 똑같이 일한다.
+
+| 구분    | 손님 A (acks=all)            | 손님 B (acks=0) | 주방 (브로커)       |
+| ----- | -------------------------- | ------------- | -------------- |
+| 주문    | "비빔밥 하나요!"                 | "김밥 하나요!"     | 둘 다 주문을 받음     |
+| 처리 방식 | 음식이 완전히 나올 때까지 기다림         | 주문만 하고 바로 떠남  | 평소처럼 요리 진행     |
+| 응답 대기 | 모든 과정 완료까지 기다림 (ISR 전체 확인) | 응답 기다리지 않음    | 응답 여부와 관계없이 처리 |
+
+
+
