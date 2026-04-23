@@ -63,24 +63,46 @@ kafka-storage.sh format -t {생성된UUID} -c /path/server.properties
 
 ### 1. 쿼럼(투표) 상태 확인 방법
 > `bootstrap-server` 지정 시 `,`를 통해 여러 서버의 주소를 입력하여, 클러스터의 전반적인 투표권자(Quorum) 상태를 확인 할 수 있음
+- quorum에 지정 브로커는 무조건 `broker`권한을 가지고 있어야 한다.
+  - `contrlller` 내부 통신만 가능하며, broker들을 조율하는 역할을 함
+
+#### 흐름 구조
+```text
+kafka-metadata-quorum 명령어 동작 방식
+
+1. --bootstrap-server로 지정한 broker에 접속
+         ↓
+2. broker에게 "Controller 쿼럼 상태" 요청
+         ↓
+3. broker가 Controller에게 대신 물어봄
+         ↓
+4. Controller 쿼럼 상태 정보를 broker가 받아서 반환
+         ↓
+5. 클라이언트에게 결과 출력
+```
+
 #### CLI 명령어
 ```shell
 kafka-metadata-quorum --bootstrap-server 192.168.0.50:9092,192.168.0.51:9092,192.168.0.52:9092 describe --status
 ```
 #### 응답
+- `LeaderId` : controller 중 리더 node 아이디 
+  -  클러스터 **전체 관리** 역할
+- `CurrentVoters` : controller node 아이디 
+- `CurrentObservers` : broker node 아이디 
 ```text
-ClusterId:              MkU3OEVBNTcwNTJENDM2Qk
-LeaderId:               1
-LeaderEpoch:            5
-HighWatermark:          1234
+ClusterId:              MkU3OEVBNTcwNTJENDM2Qg
+LeaderId:               5
+LeaderEpoch:            1
+HighWatermark:          290
 MaxFollowerLag:         0
-MaxFollowerLagTimeMs:   0
-CurrentVoters:          [1, 2, 3]
-CurrentObservers:       []
+MaxFollowerLagTimeMs:   322
+CurrentVoters:          [4,5,6]
+CurrentObservers:       [1,2,3]
 ```
 
 ### 2. kafka UI 사용
-> Docker compose를 사용하여 진행
+> bootstrap-server 는 broker 권한이 있는 대상으로 지정 필수
 ```yaml
 services:
   kafka-ui:
