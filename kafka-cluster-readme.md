@@ -8,16 +8,27 @@
     - **대규모/상용:** `broker` (데이터 처리 전용) / `controller` (상태 관리 및 투표 전용)로 완전히 분리하여 리소스 병목을 방지
       - ex) 상태 관리 및 투표 전용 : `KAFKA_PROCESS_ROLES: "controller"`
       - ex) 데이터 처리 전용 : `KAFKA_PROCESS_ROLES: "broker"`
-- `KAFKA_INTER_BROKER_LISTENER_NAME` : 브로커들끼리 **파티션 데이터를 복제**할 때 사용할 **통신 채널 이름 지정**
-  - `INTERNAL` 채널을 복제 전용으로 외부(EXTERNAL)과 **채널을 분리하여 복제 성능 보장**
-  - ex) `KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"`
-- `KAFKA_CONTROLLER_LISTENER_NAMES` : KRaft Controller 중 **리더 선출 및 메타데이터를 동기화**할 때 사용할 **통신 채널 이름 지정**
-    - 대규모 데이터 복제 트래픽이 발생하는 `INTERNAL` 망과 합칠 경우, 네트워크 병목 시 상태 확인이 지연되어 멀쩡한 브로커가 죽은 것으로 장애가 될 수 있음
-    - ex) `KAFKA_CONTROLLER_LISTENER_NAMES.CONTROLLER` 
-- `KAFKA_LISTENER_SECURITY_PROTOCOL_MAP` : 관리자가 정의한 리스너 이름과 실제 보안 프로토콜을 매핑 설정
+- 성능을 위한 `LISTENER_NAME` 지정
+  - 💻**궁극적 이유** : 포트를 분환하여 한쪽으로 쏠림 방지
+  - `KAFKA_INTER_BROKER_LISTENER_NAME` : 브로커 간 **파티션 데이터를 복제** 시 **통신 채널 이름 지정**
+    - `INTERNAL` 채널을 복제 전용으로 외부(EXTERNAL)과 **채널을 분리하여 복제 성능 보장**
+    - ex) `KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"`
+  - `KAFKA_CONTROLLER_LISTENER_NAMES` : Controller 중 **리더 선출 및 메타데이터를 동기화**할 때 사용할 **통신 채널 이름 지정**
+      - **사용 이유** :대규모 데이터 복제 트래픽이 발생하는 `INTERNAL` 망과 합칠 경우, 네트워크 병목 시 상태 확인이 지연되어 멀쩡한 브로커가 죽은 것으로 장애가 될 수 있음
+      - ex) `KAFKA_CONTROLLER_LISTENER_NAMES.CONTROLLER` 
+- `KAFKA_LISTENER_SECURITY_PROTOCOL_MAP` : 관리자가 정의한 리스너 이름과 **실제 보안 프로토콜을 매핑 설정**
   - `INTERNAL : PLAINTEXT` : 브로커 내부 복제 통신, 암호화 없음
   - `EXTERNAL : PLAINTEXT` : Spring Boot 등 외부 접속, 암호화 없음
   - `CONTROLLER : PLAINTEXT` : 컨트롤러 상태 관리 통신, 암호화 없음
+
+## `KAFKA_PROCESS_ROLES: contrlller` 란?
+> 클라이언트(Producer/Consumer)에 사용되는 브로커가 아닌, 클러스터 자체를 관리함  
+> - (구)ZooKeeper의 역할을 한다.
+- controller 개수는 **홀수로 지정**한다.
+  - **과반수(Quorum) 합의**가 필요하기 때문이다.
+  - 3대의 컨트롤러 중 1대가 장애를 겪어도 과반수(2대) 합의를 통해 클러스터를 정상 유지
+- controller 역할만 부여할 경우 Cluster 내부 브로커들간만 통신하기에 `INTERNAL, EXTERNAL` **리스너 불필요**
+  - 🔍 클라이언트/브로커 **데이터 통신 없음**
 
 ## 전체 통신 흐름
 ```text
