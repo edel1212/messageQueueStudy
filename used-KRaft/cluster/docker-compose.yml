@@ -177,7 +177,7 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: "4@kafka-controller-1:29093,5@kafka-controller-2:29093,6@kafka-controller-3:29093"
 
       # 💡 순수 Controller는 CONTROLLER 리스너만 필요합니다.
-      # INTERNAL, EXTERNAL 리스너 불필요 (클라이언트/브로커 데이터 통신 없음)
+      # INTERNAL, EXTERNAL 리스너 불필요 (클라이언트/브로커 데이터 통신 없음) - 설정할 경우 서버 기동 시 에러 발생함 (role : controller 하나 일 경우)
       # ADVERTISED_LISTENERS, INTER_BROKER_LISTENER_NAME 설정 불필요
       KAFKA_LISTENERS: "CONTROLLER://0.0.0.0:29093"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
@@ -185,7 +185,6 @@ services:
 
       # 💡 데이터 복제는 안하지만 Raft 합의 로그(메타데이터)는 디스크에 저장하므로 필요
       KAFKA_LOG_DIRS: "/tmp/kraft-controller-logs"
-
 
       # 💡 아래 3개 설정은 broker의 데이터 복제 관련 설정이므로 Controller에는 불필요
       # KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR         ❌
