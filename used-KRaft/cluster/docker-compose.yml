@@ -15,29 +15,30 @@ services:
       # 해당 서버가 가지는 Roles
       # 브로커 서버가 많을 경우 ROLE을 더 세분화 하여 저장한다.
       # ex) 3개의 브로커는 "controller"를 갖고 나머지 40대는 "broker"역할만 진행
-      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_PROCESS_ROLES: "broker"
       # 💡 [클러스터 핵심] 컨트롤러 쿼럼(Quorum) 구성
       # 포맷: [Node_ID]@[Hostname]:[Port]
       #
       # - 고가용성: 3대의 컨트롤러 중 1대가 장애를 겪어도 과반수(2대) 합의를 통해 클러스터를 정상 유지합니다.
       # - 등록 조건: process.roles에 'controller' 역할이 부여된 노드만 이 목록에 명시할 수 있습니다.
       # - 공통 필수값: 투표권이 없는 순수 'broker' 노드 역시 컨트롤러의 위치를 알아야 하므로, 클러스터 내 모든 서버에 동일하게 선언되어야 합니다.
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "4@kafka-controller-1:29093,5@kafka-controller-2:29093,6@kafka-controller-3:29093"
 
       # [2] 네트워크 / 통신 설정
-      # 💡 [클러스터 핵심] 통신망을 3개로 분리합니다.
+      # 💡 [클러스터 핵심] 통신망을 2개로 분리합니다. (순수 broker는 CONTROLLER 통신망 불필요)
       # INTERNAL: 카프카 브로커들끼리 데이터를 복제할 때 쓰는 **내부 통신망**
       # EXTERNAL: Spring Boot 서버가 접속할 **외부 통신망**
-      # CONTROLLER: **클러스터 상태 관리**를 위한 통신망
-      KAFKA_LISTENERS: "INTERNAL://kafka-1:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093"
+      KAFKA_LISTENERS: "INTERNAL://kafka-1:29092,EXTERNAL://0.0.0.0:9092"
       # 남에게 알려줄 주소를 작성
       KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka-1:29092,EXTERNAL://localhost:9092"
       # 복제용 채널 리스너 지정 - 브로커들끼리 데이터를 주고받을(복제할) 때 어떤 리스너 지정
       KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
       # 컨트롤러용 채널 - KRaft 컨트롤러들이 서로 상태를 공유할 때 사용할 리스너 이름을 지정
+      # 🔍 broker 역할만 진행하더라도 해당 설정 필요 - broker가 controller에게 접속할 때 사용
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       # 리스너 이름(사용자가 정의한 이름)과 실제 카프카가 이해하는 보안 프로토콜을 연결하는 지도입니다.
       # > "내가 INTERNAL이라고 부르는 리스너는 사실 PLAINTEXT(암호화 없음) 규약을 따를 거야"라고 정의하는 것입니다.
+      # 🔍 CONTROLLER:PLAINTEXT - broker가 controller 접속 시 어떤 프로토콜인지 알기 위해 필요
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
 
       # 존재하지 않는 토픽으로 메시지를 보낼 때, 브로커가 알아서 토픽을 만들지 여부를 결정
@@ -46,14 +47,20 @@ services:
 
       # [3] 저장소 및 클러스터 식별 설정
       KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
-      # 💡 [클러스터 핵심] 3대의 브로커가 모두 "같은 클러스터 ID"를 가져야 하나의 팀으로 묶입니다.
+      # 💡 [클러스터 핵심] 모든 브로커가 "같은 클러스터 ID"를 가져야 하나의 팀으로 묶입니다.
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
 
-      # 💡 [클러스터 핵심] 이제 브로커가 3대이므로, 삽질하셨던 1 값을 정석인 3으로 돌려놓습니다.
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2 # 최소 2대 이상 동기화되어야 정상으로 판단
 
+    depends_on:
+      kafka-controller-1:
+        condition: service_healthy
+      kafka-controller-2:
+        condition: service_healthy
+      kafka-controller-3:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 10s
@@ -73,11 +80,10 @@ services:
       - kafka-cluster-net
     environment:
       KAFKA_NODE_ID: 2
-      KAFKA_PROCESS_ROLES: "broker,controller"
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093"
+      KAFKA_PROCESS_ROLES: "broker"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "4@kafka-controller-1:29093,5@kafka-controller-2:29093,6@kafka-controller-3:29093"
 
-      # 자신의 호스트명(kafka-2)과 포트(9093)에 맞게 리스너 수정
-      KAFKA_LISTENERS: "INTERNAL://kafka-2:29092,EXTERNAL://0.0.0.0:9093,CONTROLLER://0.0.0.0:29093"
+      KAFKA_LISTENERS: "INTERNAL://kafka-2:29092,EXTERNAL://0.0.0.0:9093"
       KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka-2:29092,EXTERNAL://localhost:9093"
       KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
@@ -85,11 +91,18 @@ services:
 
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
-      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk" # 1번 브로커와 동일한 ID
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
 
+    depends_on:
+      kafka-controller-1:
+        condition: service_healthy
+      kafka-controller-2:
+        condition: service_healthy
+      kafka-controller-3:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9093", "--list"]
       interval: 10s
@@ -109,11 +122,10 @@ services:
       - kafka-cluster-net
     environment:
       KAFKA_NODE_ID: 3
-      KAFKA_PROCESS_ROLES: "broker,controller"
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093"
+      KAFKA_PROCESS_ROLES: "broker"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "4@kafka-controller-1:29093,5@kafka-controller-2:29093,6@kafka-controller-3:29093"
 
-      # 자신의 호스트명(kafka-3)과 포트(9094)에 맞게 리스너 수정
-      KAFKA_LISTENERS: "INTERNAL://kafka-3:29092,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:29093"
+      KAFKA_LISTENERS: "INTERNAL://kafka-3:29092,EXTERNAL://0.0.0.0:9094"
       KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka-3:29092,EXTERNAL://localhost:9094"
       KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
@@ -121,11 +133,18 @@ services:
 
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
-      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk" # 1, 2번 브로커와 동일한 ID
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
 
+    depends_on:
+      kafka-controller-1:
+        condition: service_healthy
+      kafka-controller-2:
+        condition: service_healthy
+      kafka-controller-3:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9094", "--list"]
       interval: 10s
@@ -134,7 +153,112 @@ services:
       start_period: 20s
 
   # =========================================================
-  # 🟣 [신규] Kafka UI - 클러스터 상태 시각화 대시보드
+  # 🔵 컨트롤러 1번 (kafka-controller-1)
+  # - 순수 Controller 전용 노드
+  # - 클라이언트(Producer/Consumer) 접속 불가 ❌
+  # - 역할: 리더 선출, 메타데이터 관리, 브로커 장애 감지 (구 ZooKeeper 역할)
+  # =========================================================
+  kafka-controller-1:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-controller-1
+    # 💡 외부 포트 노출 없음 - 클라이언트가 직접 접속할 일이 없음
+    networks:
+      - kafka-cluster-net
+    environment:
+      # 💡 브로커와 동일한 클러스터 ID를 가져야 같은 클러스터로 인식
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      # 💡 브로커의 노드 아이디
+      KAFKA_NODE_ID: 4
+      # 순수 Controller 역할만 수행
+      KAFKA_PROCESS_ROLES: "controller"
+      # 💡 [클러스터 핵심] 컨트롤러 쿼럼(Quorum) 구성
+      # - 3대의 컨트롤러 중 1대가 장애를 겪어도 과반수(2대) 합의를 통해 클러스터를 정상 유지합니다.
+      # - 모든 노드(broker 포함)에 동일하게 선언되어야 합니다.
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "4@kafka-controller-1:29093,5@kafka-controller-2:29093,6@kafka-controller-3:29093"
+
+      # 💡 순수 Controller는 CONTROLLER 리스너만 필요합니다.
+      # INTERNAL, EXTERNAL 리스너 불필요 (클라이언트/브로커 데이터 통신 없음)
+      # ADVERTISED_LISTENERS, INTER_BROKER_LISTENER_NAME 설정 불필요
+      KAFKA_LISTENERS: "CONTROLLER://0.0.0.0:29093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT"
+
+      # 💡 데이터 복제는 안하지만 Raft 합의 로그(메타데이터)는 디스크에 저장하므로 필요
+      KAFKA_LOG_DIRS: "/tmp/kraft-controller-logs"
+
+
+      # 💡 아래 3개 설정은 broker의 데이터 복제 관련 설정이므로 Controller에는 불필요
+      # KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR         ❌
+      # KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR ❌
+      # KAFKA_TRANSACTION_STATE_LOG_MIN_ISR            ❌
+
+    # 💡 순수 Controller는 kafka-topics 명령 사용 불가 (broker 기능 없음)
+    #    대신 CONTROLLER 포트(29093)가 열려있는지로 health 체크
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 29093 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # =========================================================
+  # 🔵 컨트롤러 2번 (kafka-controller-2)
+  # =========================================================
+  kafka-controller-2:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-controller-2
+    networks:
+      - kafka-cluster-net
+    environment:
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_NODE_ID: 5
+      KAFKA_PROCESS_ROLES: "controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "4@kafka-controller-1:29093,5@kafka-controller-2:29093,6@kafka-controller-3:29093"
+
+      KAFKA_LISTENERS: "CONTROLLER://0.0.0.0:29093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT"
+
+      KAFKA_LOG_DIRS: "/tmp/kraft-controller-logs"
+
+
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 29093 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # =========================================================
+  # 🔵 컨트롤러 3번 (kafka-controller-3)
+  # =========================================================
+  kafka-controller-3:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-controller-3
+    networks:
+      - kafka-cluster-net
+    environment:
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_NODE_ID: 6
+      KAFKA_PROCESS_ROLES: "controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "4@kafka-controller-1:29093,5@kafka-controller-2:29093,6@kafka-controller-3:29093"
+
+      KAFKA_LISTENERS: "CONTROLLER://0.0.0.0:29093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT"
+
+      KAFKA_LOG_DIRS: "/tmp/kraft-controller-logs"
+
+
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 29093 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # =========================================================
+  # 🟣 Kafka UI - 클러스터 상태 시각화 대시보드
   # =========================================================
   # - 파티션별 Leader/ISR 변화를 실시간 GUI로 확인 (장애 테스트 학습 필수)
   # - Consumer Group Lag, 메시지 내용 조회, 토픽 생성/삭제까지 GUI 제공
