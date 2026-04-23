@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: kafka-cluster-producer-server
+  ## kafka 설정
+  kafka:
+    bootstrap-servers: localhost:9092,localhost:9093,localhost:9094 # 카프카 브로커 주소
+
+server:
+  port: 8010
