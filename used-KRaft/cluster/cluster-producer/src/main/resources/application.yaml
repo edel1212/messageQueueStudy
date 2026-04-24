@@ -3,6 +3,8 @@ spring:
     name: kafka-cluster-producer-server
   ## kafka 설정
   kafka:
+    # 🔍 구정된 브로커 서버를 나열
+    # - 만약 10개의 브로커라도 전체를 다열해줄 필요는 없음
     bootstrap-servers: localhost:9092,localhost:9093,localhost:9094 # 카프카 브로커 주소
 
 server:
