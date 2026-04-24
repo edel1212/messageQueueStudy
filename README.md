@@ -44,7 +44,7 @@
 - 대표 기술: `Apache Kafka`, `AWS Kinesis`
 
 ## 주요 Message Queue
-### Apache Kafka - [정리](https://github.com/edel1212/messageQueueStudy/blob/main/kafka-readme.md)
+### Apache Kafka
 > `이벤트 브로커(Event Broker)` 방식
 - 토픽(`topic`)라고 불리는 카테고리에 데이터 집합을 저장
   - ⭐️하나의 topic은 다수의 partition으로 나뉘어짐
@@ -71,6 +71,10 @@
   - `Queue`를 구독하는 `Consumer`가 메세지를 소비합니다.
 - Amazon SQS (Simple Queue Service)
   - AWS에서 제공하는 관리형 메시지 큐 서비스로, 고가용성과 확장성을 제공.
-    
+
+## Kafka 내용 정리
+- [kafka 정리](https://github.com/edel1212/messageQueueStudy/blob/main/kafka-readme.md)
+- [kafka width spring 정리](https://github.com/edel1212/messageQueueStudy/blob/main/kafka-with-spring-boot-readme.md)
+- [kafka cluster 정리](https://github.com/edel1212/messageQueueStudy/blob/main/kafka-cluster-readme.md)
 
     

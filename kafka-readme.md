@@ -243,8 +243,3 @@ public class InventorConsumer {
   - 관리자가 DLQ 토픽의 메시지만 따로 꺼내서 **수동 복구(Replay) 처리 진행**
 - [설정 방법](https://github.com/edel1212/messageQueueStudy/blob/main/kafka-with-spring-boot-readme.md#%EC%BB%A8%EC%8A%88%EB%A8%B8-%EC%9E%A5%EC%95%A0-%EC%B2%98%EB%A6%AC---dlq-dead-letter-queue-%EC%84%A4%EC%A0%95)
 
-## Zookeeper 사용 버전
-### 단일 노드 방식 예시 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/easy-version)
-- 경량화된 Kafa, Zookeeper를 사용하여 Producer, Conuser 사용
-### Cluster 방식 예시 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/advance-version)
-- 3개의 Borkder, Zookeeper를 이용하여 Cluster 구성과 파티셔닝 및 복제 사용
