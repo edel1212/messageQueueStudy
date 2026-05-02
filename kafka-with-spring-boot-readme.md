@@ -4,6 +4,21 @@
 ## 기본 Produce Server <->  Consumer Server
 > Produce / Consumer Server 를 나눠서 구축하여 진행  
 
+### application.yml
+- bootstrapServers는 ","를 사용해서 다수의 브로커 권한을 갖는 서버 등록이 가능하다.
+  - controller 권한을 갖는 브로커는 **등록 불가능**
+```yaml
+spring:
+  application:
+    name: kafka-cluster-producer-server
+  ## kafka 설정
+  kafka:
+    # 🔍 구정된 브로커 서버를 나열
+    # - 만약 10개의 브로커라도 전체를 브로커 주소를 전부 나열해줄 필요는 없다
+    bootstrap-servers: localhost:9092,localhost:9093,localhost:9094 
+
+```
+
 ### Produce Server Config
 ```java
 @Configuration

@@ -2,13 +2,15 @@
 
 ## 구조
 - `Producer` : 메시지를 생성하여 카프카 토픽으로 전송하는 주체
+- `Broker` : 카프카 애플리케이션이 설치된 각각의 서버 단위
+  - 브로커 서버를 여러대로 구성하여, **클러스터(Cluster)로 묶어서 운영 가능**
 - `Cluster` : 여러 대의 Broker(Kafka servers)들을 묶어 단일 시스템처럼 동작하게 만든 아키텍처 
   - 고가용성 및 확장성 제공
-- `Broker` : 카프카 애플리케이션이 설치된 각각의 서버 단위
 - `Topic` : 메시지를 구분하는 논리적인 단위. 목적에 따라 관리자(CLI, UI) 또는 서버 내 코드를 통해 생성함
   - DB로 따지면 Table의 개념
-- `Partition` : 하나의 `Topic`을 여러 개로 분할한 물리적 단위. 이를 통해 데이터를 분산 저장하고 병렬 처리를 가능하게 함
-  - 설정(`Replication Factor`)에 따라 파티션 단위로 복제본(Replica)을 생성하여 여러 브로커에 안전하게 분산 저장할 수 있음.
+  - **1개 이상**의 `Partition`을 소유한다.
+- `Partition` : 하나의 `Topic`을 여러 개로 **분할한 물리적 단위** 이를 통해 데이터를 **분산 저장**하고 **병렬 처리를 가능하게 함**
+  - `Replication Factor` 설정에 따라 **파티션 단위로 브로커 간 복제본을 생성**하여 **여러 브로커에 안전하게 분산 저장** 가능함
 - `Offset` : 각 파티션 내에서 메시지가 부여받는 고유한 순번
   - `Consumer`가 데이터를 어디까지 읽었는지 추적하는 용도
 - `Replica` : 파티션의 복제본. 특정 Broker에 장애가 발생해도 다른 Broker에 저장된 복제본을 통해 데이터 유실 없이 서비스를 지속할 수 있게 함
@@ -241,8 +243,3 @@ public class InventorConsumer {
   - 관리자가 DLQ 토픽의 메시지만 따로 꺼내서 **수동 복구(Replay) 처리 진행**
 - [설정 방법](https://github.com/edel1212/messageQueueStudy/blob/main/kafka-with-spring-boot-readme.md#%EC%BB%A8%EC%8A%88%EB%A8%B8-%EC%9E%A5%EC%95%A0-%EC%B2%98%EB%A6%AC---dlq-dead-letter-queue-%EC%84%A4%EC%A0%95)
 
-## Zookeeper 사용 버전
-### 단일 노드 방식 예시 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/easy-version)
-- 경량화된 Kafa, Zookeeper를 사용하여 Producer, Conuser 사용
-### Cluster 방식 예시 [링크](https://github.com/edel1212/messageQueueStudy/tree/main/advance-version)
-- 3개의 Borkder, Zookeeper를 이용하여 Cluster 구성과 파티셔닝 및 복제 사용
